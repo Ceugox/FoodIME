@@ -1,0 +1,113 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  phone     String
+  role      Role     @default(BUYER)
+  store     Store?
+  orders    Order[]
+  createdAt DateTime @default(now())
+}
+
+model Store {
+  id          String    @id @default(uuid())
+  owner       User      @relation(fields: [ownerId], references: [id])
+  ownerId     String    @unique
+  name        String
+  description String
+  imageUrl    String?
+  whatsapp    String
+  pixKey      String
+  commissionRate Decimal   @default(0.10)
+  isOpen         Boolean   @default(false)
+  products    Product[]
+  orders      Order[]
+}
+
+model Product {
+  id          String      @id @default(uuid())
+  store       Store       @relation(fields: [storeId], references: [id])
+  storeId     String
+  name        String
+  imageUrl    String?
+  price       Decimal
+  stockQty    Int
+  isAvailable Boolean     @default(true)
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  buyer       User        @relation(fields: [buyerId], references: [id])
+  buyerId     String
+  store       Store       @relation(fields: [storeId], references: [id])
+  storeId     String
+  items       OrderItem[]
+  payment     Payment?
+  status      OrderStatus @default(PENDING)
+  code        String      @unique
+  totalAmount Decimal
+  createdAt   DateTime    @default(now())
+}
+
+model OrderItem {
+  id              String  @id @default(uuid())
+  order           Order   @relation(fields: [orderId], references: [id])
+  orderId         String
+  product         Product @relation(fields: [productId], references: [id])
+  productId       String
+  quantity        Int
+  priceAtPurchase Decimal
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  order       Order         @relation(fields: [orderId], references: [id])
+  orderId     String        @unique
+  method      PaymentMethod
+  gatewayTxId String
+  grossAmount Decimal
+  commission  Decimal
+  netAmount   Decimal
+  status      PaymentStatus @default(PROCESSING)
+  createdAt   DateTime      @default(now())
+}
+
+enum Role {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PICKED_UP
+  CANCELLED
+}
+
+enum PaymentMethod {
+  PIX
+  CREDIT_CARD
+}
+
+enum PaymentStatus {
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+}

@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "cmd",
+      "args": [
+        "/c", "npx", "y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:/Users/Rafael Carvalheira/Documents/GitHub/foodime"
+      ]
+    },
+    "github": {
+      "command": "cmd",
+      "args": [
+        "/c", "npx", "y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_SEU_TOKEN_AQUI"
+      }
+    }
+  }
+}

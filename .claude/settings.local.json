@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__filesystem__read_multiple_files",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__apply_migration",
+      "Bash(npx create-expo-app mobile --template blank-typescript)",
+      "Bash(npx expo install:*)"
+    ]
+  }
+}
