@@ -28,6 +28,8 @@ SaaS mobile de venda de comida dentro de faculdades, começando pelo IME (Instit
 - Preço é **snapshottado** no OrderItem no momento da compra (histórico não é afetado por mudanças futuras de preço)
 - Webhook do gateway deve ter **assinatura validada** antes de qualquer processamento
 - Cartão de crédito salvo via **card_token** — nunca armazenar dados de cartão diretamente
+- Pagamento com cartão pode ser **aprovado ou rejeitado imediatamente** na resposta da API do MP — backend deve verificar `status` e `status_detail` e agir sem esperar webhook
+- Rejeições de cartão devem exibir **mensagem específica** ao comprador (mapeamento de `status_detail` em `getCardRejectionMessage()`)
 
 ---
 
@@ -320,12 +322,22 @@ enum PaymentStatus { PROCESSING PAID FAILED REFUNDED }
 2. App → POST /orders → backend cria Order (status: PENDING)
 3. Backend → Mercado Pago: cria pagamento (Pix ou Cartão)
    └── Todo valor vai para conta MP da empresa
-4. Mercado Pago retorna QR Code Pix (copia-e-cola + base64) ou processa cartão
-5. Comprador efetua pagamento
-6. Mercado Pago → webhook POST /payments/webhook
-7. Backend valida x-signature do webhook + consulta GET /v1/payments/:id
-8. Transação Prisma atômica:
-   └── Verifica estoque de cada item
+
+FLUXO PIX:
+4a. Mercado Pago retorna QR Code Pix (copia-e-cola + base64)
+5a. Comprador efetua pagamento no app do banco
+6a. Mercado Pago → webhook POST /payments/webhook
+7a. Backend valida x-signature do webhook + consulta GET /v1/payments/:id
+8a. Transação Prisma atômica (ver abaixo)
+
+FLUXO CARTÃO DE CRÉDITO:
+4b. Mercado Pago retorna status na resposta da API
+5b. Se status = "approved" → backend confirma imediatamente (sem webhook)
+    Se status = "rejected" → retorna erro específico ao mobile (ex: saldo insuficiente, CVV inválido)
+    Se status = "in_process" → aguarda webhook (fluxo igual ao Pix: passos 6a-8a)
+
+CONFIRMAÇÃO (transação Prisma atômica):
+8. Verifica estoque de cada item
    └── Decrementa stockQty
    └── Atualiza Order.status = PAID
    └── Atualiza Payment.status = PAID
@@ -350,45 +362,44 @@ enum PaymentStatus { PROCESSING PAID FAILED REFUNDED }
 ## 9. Plano de Sprints de Desenvolvimento
 
 ### Sprint 1 — Setup e Fundação
-- [ ] Criar monorepo (backend + mobile + admin numa pasta raiz)
-- [ ] Configurar projeto NestJS com TypeScript
-- [ ] Configurar Prisma + conexão Supabase
-- [ ] Aplicar schema inicial via Supabase MCP
-- [ ] Configurar projeto Expo com TypeScript
-- [ ] Configurar React Navigation (estrutura de stacks)
-- [ ] Configurar Zustand e React Query no mobile
-- [ ] Configurar projeto Next.js para admin
-- [ ] Setup GitHub MCP: repositório, branches, CI/CD básico
-- [ ] Criar arquivos .env.example para os três projetos
+- [x] Criar monorepo (backend + mobile + admin numa pasta raiz)
+- [x] Configurar projeto NestJS com TypeScript
+- [x] Configurar Prisma + conexão Supabase
+- [x] Aplicar schema inicial via Supabase MCP
+- [x] Configurar projeto Expo com TypeScript
+- [x] Configurar React Navigation (estrutura de stacks)
+- [x] Configurar Zustand e React Query no mobile
+- [x] Configurar projeto Next.js para admin
+- [x] Setup GitHub MCP: repositório, branches, CI/CD básico
+- [x] Criar arquivos .env.example para os três projetos
 
 ### Sprint 2 — Autenticação
-- [ ] Backend: módulo auth com registro e login (JWT + refresh token)
-- [ ] Backend: guards JwtAuthGuard e RolesGuard
-- [ ] Backend: endpoints POST /auth/register (buyer e seller), POST /auth/login, POST /auth/refresh
-- [ ] Mobile: telas de Login e Registro (comprador e vendedor)
-- [ ] Mobile: Zustand authStore com persistência de token
-- [ ] Mobile: Axios interceptor de refresh token
-- [ ] Mobile: RootNavigator com redirecionamento por role
-- [ ] Admin: tela de login protegida com role ADMIN
+- [x] Backend: módulo auth com registro e login (JWT + refresh token)
+- [x] Backend: guards JwtAuthGuard e RolesGuard
+- [x] Backend: endpoints POST /auth/register (buyer e seller), POST /auth/login, POST /auth/refresh
+- [x] Mobile: telas de Login e Registro (comprador e vendedor)
+- [x] Mobile: Zustand authStore com persistência de token
+- [x] Mobile: Axios interceptor de refresh token
+- [x] Mobile: RootNavigator com redirecionamento por role
+- [x] Admin: tela de login protegida com role ADMIN
 
 ### Sprint 3 — Lojas e Produtos
-- [ ] Backend: módulo stores (CRUD, toggle isOpen)
-- [ ] Backend: módulo products (CRUD, atualização rápida de stockQty)
-- [ ] Backend: upload de imagens via Supabase Storage
-- [ ] Supabase MCP: políticas RLS para stores e products
-- [ ] Mobile (seller): tela de configurações da loja
-- [ ] Mobile (seller): tela de produtos com edição rápida de estoque inline
-- [ ] Mobile (buyer): tela home com lista de vendedores ativos
-- [ ] Mobile (buyer): tela da loja com produtos, badge "Últimas unidades" (<10) e bloqueio de produto zerado
+- [x] Backend: módulo stores (CRUD, toggle isOpen)
+- [x] Backend: módulo products (CRUD, atualização rápida de stockQty)
+- [x] Supabase: políticas RLS para stores e products (SQL em `backend/prisma/rls-store-product.sql`)
+- [x] Mobile (seller): tela de configurações da loja
+- [x] Mobile (seller): tela de produtos com edição rápida de estoque inline
+- [x] Mobile (buyer): tela home com lista de vendedores ativos
+- [x] Mobile (buyer): tela da loja com produtos, badge "Últimas unidades" (<10) e bloqueio de produto zerado
 
 ### Sprint 4 — Pedidos
-- [ ] Backend: módulo orders (criação, listagem por role)
-- [ ] Backend: geração de código único de comprovante
-- [ ] Mobile (buyer): tela de carrinho
-- [ ] Mobile (buyer): tela de checkout (seleção de método de pagamento)
-- [ ] Mobile (buyer): tela de comprovante com código do pedido
-- [ ] Mobile (buyer): histórico de pedidos
-- [ ] Mobile (seller): tela de pedidos do dia
+- [x] Backend: módulo orders (criação, listagem por role)
+- [x] Backend: geração de código único de comprovante
+- [x] Mobile (buyer): tela de carrinho
+- [x] Mobile (buyer): tela de checkout (seleção de método de pagamento)
+- [x] Mobile (buyer): tela de comprovante com código do pedido
+- [x] Mobile (buyer): histórico de pedidos
+- [x] Mobile (seller): tela de pedidos do dia
 
 ### Sprint 5 — Pagamentos (Mercado Pago)
 - [x] Backend: módulo payments com integração Mercado Pago
@@ -397,35 +408,35 @@ enum PaymentStatus { PROCESSING PAID FAILED REFUNDED }
 - [x] Backend: lógica de decremento atômico de estoque na confirmação
 - [x] Backend: lógica de estorno automático em caso de falha de estoque
 - [x] Mobile (buyer): fluxo Pix (QR Code via react-native-qrcode-svg, copia-e-cola, timer 15min)
-- [ ] Mobile (buyer): fluxo cartão de crédito (token via SDK MP)
+- [x] Mobile (buyer): fluxo cartão de crédito (token via SDK MP, aprovação imediata, mensagens de erro específicas)
 - [ ] Testar fluxo completo em ambiente sandbox do Mercado Pago
 
 ### Sprint 6 — Tempo Real e Notificações
-- [ ] Backend: Socket.io gateway para evento de novo pedido
-- [ ] Backend: push notification via Expo/FCM no evento de pedido
-- [ ] Mobile (seller): useSocket hook conectado ao room do vendedor
-- [ ] Mobile (seller): atualização em tempo real da tela de pedidos
+- [x] Backend: Socket.io gateway para evento de novo pedido
+- [x] Backend: push notification via Expo/FCM no evento de pedido
+- [x] Mobile (seller): useSocket hook conectado ao room do vendedor
+- [x] Mobile (seller): atualização em tempo real da tela de pedidos
 - [ ] Testar fluxo completo compra → notificação → comprovante
 
 ### Sprint 7 — Dashboard do Vendedor
-- [ ] Backend: endpoints de métricas (receita por dia/semana/mês, pedidos, produto mais vendido)
-- [ ] Mobile (seller): DashboardScreen com gráfico de receita e cards de métricas
-- [ ] Mobile (seller): histórico de transações com comissão detalhada
+- [x] Backend: endpoints de métricas (receita por dia/semana/mês, pedidos, produto mais vendido)
+- [x] Mobile (seller): DashboardScreen com gráfico de receita e cards de métricas
+- [x] Mobile (seller): histórico de transações com comissão detalhada
 
 ### Sprint 8 — Painel Admin
-- [ ] Admin: listagem e busca de compradores e vendedores
-- [ ] Admin: visualização e edição de qualquer usuário
-- [ ] Admin: exclusão de usuário
-- [ ] Admin: dashboard individual de cada vendedor
-- [ ] Admin: histórico de compras de cada comprador
-- [ ] Admin: visão geral de todas as transações com filtros
+- [x] Admin: listagem e busca de compradores e vendedores
+- [x] Admin: visualização e edição de qualquer usuário
+- [x] Admin: exclusão de usuário
+- [x] Admin: dashboard individual de cada vendedor
+- [x] Admin: histórico de compras de cada comprador
+- [x] Admin: visão geral de todas as transações com filtros
 - [ ] Admin: painel de splits realizados com opção de bloqueio manual
 
 ### Sprint 9 — Polish, Testes e Beta
 - [ ] Testes de integração nos fluxos críticos (compra, webhook, estoque)
 - [ ] Tratamento de edge cases (timeout de pagamento, app fechado durante compra)
 - [ ] UX review nas telas principais
-- [ ] Configurar RLS completo no Supabase MCP
+- [x] Configurar RLS completo no Supabase MCP
 - [ ] Deploy backend no Railway
 - [ ] Deploy admin na Vercel
 - [ ] Build do app via Expo EAS (TestFlight + APK interno)
@@ -474,7 +485,23 @@ ADMIN_PASSWORD_HASH=
 
 ---
 
-## 12. Instruções de Uso no Claude Code
+## 12. Últimas Alterações
+
+> **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
+
+### [2026-02-22] Aprovação imediata de cartão de crédito
+- **Problema:** Pagamento com cartão ficava travado em "Aguardando pagamento..." porque o backend sempre salvava status `PROCESSING` e esperava o webhook, mas o Mercado Pago aprova cartão de crédito instantaneamente na resposta da API.
+- **Solução:** `payments.service.ts` agora verifica `result.status` após criar pagamento com cartão. Se `approved`, confirma o pedido imediatamente (decrementa estoque, muda status para PAID, notifica vendedor). Se `rejected`, lança erro com mensagem específica. Se outro status (`in_process`), segue o fluxo normal via webhook.
+- **Arquivos alterados:** `backend/src/modules/payments/payments.service.ts`, `backend/src/modules/payments/mercadopago.service.ts`
+
+### [2026-02-22] Mensagens de erro específicas por rejeição de cartão
+- **Problema:** Qualquer rejeição de cartão mostrava mensagem genérica "Falha ao processar pagamento".
+- **Solução:** Mapeamento de `status_detail` do Mercado Pago para mensagens em português (saldo insuficiente, CVV inválido, cartão desabilitado, etc.) via método `getCardRejectionMessage()`. Mobile exibe a mensagem retornada pelo backend no Alert.
+- **Arquivos alterados:** `backend/src/modules/payments/payments.service.ts`, `mobile/src/screens/buyer/CheckoutScreen.tsx`
+
+---
+
+## 13. Instruções de Uso no Claude Code
 
 Ao iniciar qualquer sessão de desenvolvimento:
 
@@ -484,6 +511,7 @@ Ao iniciar qualquer sessão de desenvolvimento:
 4. Use o Supabase MCP para qualquer operação de banco (migrations, RLS, queries)
 5. Ao concluir uma tarefa, commite via GitHub MCP com conventional commit
 6. Marque a tarefa como concluída (`[x]`) neste arquivo via Filesystem MCP
+7. **Obrigatório:** ao finalizar qualquer alteração, atualize a **Seção 12 (Últimas Alterações)** com um resumo do que foi feito, mantendo apenas as 2 últimas entradas
 
 **Exemplo de instrução:**
 > "Implementar o módulo de autenticação do backend — Sprint 2, tarefa de registro e login"

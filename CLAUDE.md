@@ -89,10 +89,11 @@ npm run lint             # ESLint
 - Commission is calculated per order (`store.commissionRate`) and stored in the Payment record for admin visibility.
 - Pix: `POST /v1/payments` with `payment_method_id: 'pix'` — returns QR code string + base64 image. Mobile renders QR via `react-native-qrcode-svg`.
 - Credit Card: `POST /v1/payments` with token from MP SDK — never store raw card data.
+- **Credit Card immediate resolution**: MP may return `approved` or `rejected` immediately. Backend checks `result.status` after creating card payment — if `approved`, confirms order instantly without waiting for webhook. If `rejected`, throws `BadRequestException` with mapped Portuguese error message via `getCardRejectionMessage(status_detail)`.
 - Pix QR Code expires in 15 minutes — mobile polls order status every 3 seconds; shows countdown timer.
 - Webhook at `POST /payments/webhook`: validate `x-signature` header (HMAC-SHA256 with `ts`, `data.id`, `request-id`). Return 200 even for invalid signatures (but do not process).
 - On `payment.updated` webhook: fetch `GET /v1/payments/:id` to confirm real status. If `approved` → confirm order; if `rejected`/`cancelled` → fail order.
-- Stock decrement happens inside an atomic `prisma.$transaction` after webhook confirmation — if stock is insufficient, automatically refund via MP API and cancel the order.
+- Stock decrement happens inside an atomic `prisma.$transaction` after confirmation (webhook or immediate) — if stock is insufficient, automatically refund via MP API and cancel the order.
 - No `gatewayId` on Store — sellers don't need Mercado Pago accounts.
 
 ## Critical Business Rules
@@ -117,6 +118,15 @@ npm run lint             # ESLint
 
 - Branch pattern: `feature/name`, `fix/name`, `chore/name`
 - Commit convention: `feat:`, `fix:`, `chore:`, `refactor:`
+
+## Mandatory: Update PROJECT_MASTER.md on Every Change
+
+After completing any code change, you MUST update `docs/PROJECT_MASTER.md`:
+1. **Section 12 (Últimas Alterações):** Add a summary of what was changed (date, problem, solution, files). Keep only the **last 2 entries** — when adding a new one, remove the oldest.
+2. **Sprint checklist:** Mark completed tasks with `[x]`.
+3. **Business rules / architecture sections:** Update if the change affects documented behavior.
+
+This rule exists so that all developers (and their Claude Code sessions) stay aware of recent changes.
 
 ## Environment Variables
 

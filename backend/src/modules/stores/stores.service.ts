@@ -37,7 +37,7 @@ export class StoresService {
       include: {
         products: {
           where: { isAvailable: true },
-          select: { id: true, name: true, price: true, imageUrl: true, stockQty: true },
+          select: { id: true, name: true, price: true, imageUrl: true, stockQty: true, storeId: true },
         },
       },
     });
@@ -51,7 +51,7 @@ export class StoresService {
       include: {
         products: {
           where: { isAvailable: true },
-          select: { id: true, name: true, price: true, imageUrl: true, stockQty: true },
+          select: { id: true, name: true, price: true, imageUrl: true, stockQty: true, storeId: true },
         },
         owner: {
           select: { id: true, name: true },

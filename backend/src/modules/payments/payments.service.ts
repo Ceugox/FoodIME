@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MercadoPagoService } from './mercadopago.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
@@ -20,7 +20,7 @@ export class PaymentsService {
   ) {
     const order = await this.prisma.order.findUniqueOrThrow({
       where: { id: orderId },
-      include: { store: true },
+      include: { store: true, buyer: { select: { email: true } } },
     });
 
     if (order.buyerId !== user.id) {
@@ -54,24 +54,71 @@ export class PaymentsService {
         amount: amountInCents,
         orderId,
         cardToken,
+        payerEmail: order.buyer.email,
       });
       gatewayTxId = result.id;
+
+      // Card payments may be approved immediately (e.g. test card APRO)
+      if (result.status === 'approved') {
+        const commissionVal = (Number(order.totalAmount) * commissionPercent) / 100;
+        const netVal = Number(order.totalAmount) - commissionVal;
+
+        try {
+          await this.prisma.payment.create({
+            data: {
+              orderId,
+              method,
+              gatewayTxId,
+              grossAmount: order.totalAmount,
+              commission: commissionVal,
+              netAmount: netVal,
+              status: 'PROCESSING',
+            },
+          });
+        } catch (error) {
+          if (error.code === 'P2002') {
+            throw new ConflictException('Já existe um pagamento para este pedido');
+          }
+          throw error;
+        }
+
+        // Confirm immediately since MP already approved
+        await this.confirmOrderWithStockDecrement(orderId);
+
+        return {
+          data: { gatewayTxId, method },
+        };
+      }
+
+      // Card payment rejected immediately
+      if (result.status === 'rejected') {
+        throw new BadRequestException(
+          this.getCardRejectionMessage(result.statusDetail),
+        );
+      }
     }
 
     const commission = (Number(order.totalAmount) * commissionPercent) / 100;
     const netAmount = Number(order.totalAmount) - commission;
 
-    await this.prisma.payment.create({
-      data: {
-        orderId,
-        method,
-        gatewayTxId,
-        grossAmount: order.totalAmount,
-        commission,
-        netAmount,
-        status: 'PROCESSING',
-      },
-    });
+    try {
+      await this.prisma.payment.create({
+        data: {
+          orderId,
+          method,
+          gatewayTxId,
+          grossAmount: order.totalAmount,
+          commission,
+          netAmount,
+          status: 'PROCESSING',
+        },
+      });
+    } catch (error) {
+      if (error.code === 'P2002') {
+        throw new ConflictException('Já existe um pagamento para este pedido');
+      }
+      throw error;
+    }
 
     return {
       data: {
@@ -169,6 +216,27 @@ export class PaymentsService {
       totalAmount: Number(order.totalAmount),
       itemCount: order.items.length,
     });
+  }
+
+  private getCardRejectionMessage(statusDetail?: string): string {
+    const messages: Record<string, string> = {
+      cc_rejected_insufficient_amount: 'Saldo insuficiente no cartão.',
+      cc_rejected_bad_filled_security_code: 'Código de segurança (CVV) inválido.',
+      cc_rejected_bad_filled_date: 'Data de validade inválida.',
+      cc_rejected_bad_filled_other: 'Dados do cartão inválidos. Verifique e tente novamente.',
+      cc_rejected_bad_filled_card_number: 'Número do cartão inválido.',
+      cc_rejected_call_for_authorize: 'Você precisa autorizar o pagamento junto ao banco emissor.',
+      cc_rejected_card_disabled: 'Cartão desabilitado. Entre em contato com o banco emissor.',
+      cc_rejected_duplicated_payment: 'Pagamento duplicado. Já existe um pagamento com este valor.',
+      cc_rejected_high_risk: 'Pagamento recusado por motivo de segurança.',
+      cc_rejected_max_attempts: 'Número máximo de tentativas excedido. Use outro cartão.',
+      cc_rejected_other_reason: 'Pagamento recusado pelo banco emissor.',
+      cc_rejected_blacklist: 'Pagamento não processado.',
+      cc_rejected_card_type_not_allowed: 'Este tipo de cartão não é aceito.',
+      cc_rejected_invalid_installments: 'Número de parcelas inválido para este cartão.',
+    };
+
+    return messages[statusDetail ?? ''] ?? 'Pagamento recusado. Verifique os dados do cartão e tente novamente.';
   }
 
   async getPaymentByOrder(orderId: string) {

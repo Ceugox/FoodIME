@@ -20,6 +20,9 @@ import { usePaymentByOrder } from '../../hooks/usePayment';
 import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
 import { Button } from '../../components/common/Button';
+import { CreditCardForm } from '../../components/payment/credit-card-form';
+import type { CardFormData } from '../../components/payment/credit-card-form';
+import { createCardToken } from '../../services/mercadopago.service';
 import { Colors } from '../../constants/colors';
 import type { BuyerStackParamList } from '../../types/navigation.types';
 import type { InitiatePaymentResponse } from '../../types/models.types';
@@ -40,6 +43,7 @@ export function CheckoutScreen() {
   const [pixData, setPixData] = useState<InitiatePaymentResponse | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(PIX_EXPIRATION_SECONDS);
   const [copied, setCopied] = useState(false);
+  const [cardLoading, setCardLoading] = useState(false);
 
   const { data: payment } = usePaymentByOrder(orderId, paymentStarted);
 
@@ -48,7 +52,14 @@ export function CheckoutScreen() {
     if (payment?.status === 'PAID' && order) {
       navigation.replace('OrderConfirm', { orderId, code: order.code });
     }
-  }, [payment?.status, order, orderId, navigation]);
+    if (payment?.status === 'FAILED' && paymentStarted) {
+      Alert.alert(
+        'Pagamento recusado',
+        'O pagamento foi recusado. Verifique os dados e tente novamente.',
+        [{ text: 'OK', onPress: () => setPaymentStarted(false) }],
+      );
+    }
+  }, [payment?.status, order, orderId, navigation, paymentStarted]);
 
   // Pix countdown timer
   useEffect(() => {
@@ -82,6 +93,7 @@ export function CheckoutScreen() {
   if (!order) return <ErrorState message="Pedido nao encontrado" />;
 
   const handlePay = () => {
+    if (method === 'CREDIT_CARD') return; // handled by handleCardSubmit
     initiatePayment.mutate(
       { orderId, method },
       {
@@ -94,6 +106,29 @@ export function CheckoutScreen() {
         onError: () => Alert.alert('Erro', 'Falha ao iniciar pagamento'),
       },
     );
+  };
+
+  const handleCardSubmit = async (cardData: CardFormData) => {
+    setCardLoading(true);
+    try {
+      const cardToken = await createCardToken(cardData);
+      initiatePayment.mutate(
+        { orderId, method: 'CREDIT_CARD', cardToken },
+        {
+          onSuccess: () => setPaymentStarted(true),
+          onError: (error: any) => {
+            const msg =
+              error?.response?.data?.message ||
+              'Falha ao processar pagamento com cartao';
+            Alert.alert('Pagamento recusado', msg);
+          },
+        },
+      );
+    } catch {
+      Alert.alert('Erro', 'Dados do cartao invalidos. Verifique e tente novamente.');
+    } finally {
+      setCardLoading(false);
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -145,12 +180,19 @@ export function CheckoutScreen() {
               </View>
             </TouchableOpacity>
 
-            <Button
-              title="Pagar"
-              onPress={handlePay}
-              loading={initiatePayment.isPending}
-              style={{ marginTop: 24 }}
-            />
+            {method === 'CREDIT_CARD' ? (
+              <CreditCardForm
+                onSubmit={handleCardSubmit}
+                loading={cardLoading || initiatePayment.isPending}
+              />
+            ) : (
+              <Button
+                title="Pagar"
+                onPress={handlePay}
+                loading={initiatePayment.isPending}
+                style={{ marginTop: 24 }}
+              />
+            )}
           </>
         ) : method === 'PIX' && pixData?.pixQrCode ? (
           <View style={styles.pixCard}>

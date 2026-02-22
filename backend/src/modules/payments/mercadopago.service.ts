@@ -13,6 +13,7 @@ interface CardPaymentParams {
   cardToken: string;
   installments?: number;
   description?: string;
+  payerEmail: string;
 }
 
 @Injectable()
@@ -88,10 +89,9 @@ export class MercadoPagoService {
       {
         transaction_amount: params.amount / 100,
         description: params.description || 'Pedido FoodIME',
-        payment_method_id: 'credit_card',
         token: params.cardToken,
         installments: params.installments ?? 1,
-        payer: { email: 'cliente@foodime.com' },
+        payer: { email: params.payerEmail },
         metadata: { order_id: params.orderId },
       },
       params.orderId,
@@ -99,7 +99,8 @@ export class MercadoPagoService {
 
     return {
       id: String(response.id),
-      status: response.status,
+      status: response.status as string,
+      statusDetail: response.status_detail as string | undefined,
     };
   }
 
