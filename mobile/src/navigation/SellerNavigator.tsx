@@ -12,22 +12,32 @@ import type { SellerTabParamList } from '../types/navigation.types';
 const Tab = createBottomTabNavigator<SellerTabParamList>();
 
 export function SellerNavigator() {
-  // Mantém conexão Socket.io ativa em todas as tabs do seller
   useSocket();
 
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: Colors.primary,
+        tabBarActiveTintColor: Colors.accent,
         tabBarInactiveTintColor: Colors.textLight,
         headerShown: false,
+        tabBarStyle: {
+          backgroundColor: Colors.surface,
+          borderTopColor: Colors.border,
+          borderTopWidth: 1,
+          height: 60,
+          paddingBottom: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+        },
       }}
     >
       <Tab.Screen
         name="Dashboard"
         component={DashboardScreen}
         options={{
-          tabBarLabel: 'Inicio',
+          tabBarLabel: 'Início',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="stats-chart-outline" size={size} color={color} />
           ),
@@ -59,7 +69,7 @@ export function SellerNavigator() {
         options={{
           tabBarLabel: 'Loja',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
+            <Ionicons name="storefront-outline" size={size} color={color} />
           ),
         }}
       />

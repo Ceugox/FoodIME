@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -9,9 +9,15 @@ export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateProductDto, user: UserPayload) {
-    const store = await this.prisma.store.findUniqueOrThrow({
+    const store = await this.prisma.store.findUnique({
       where: { ownerId: user.id },
     });
+
+    if (!store) {
+      throw new NotFoundException(
+        'Você ainda não possui uma loja cadastrada. Configure sua loja antes de criar produtos.',
+      );
+    }
 
     const product = await this.prisma.product.create({
       data: {

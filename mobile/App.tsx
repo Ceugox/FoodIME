@@ -18,7 +18,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <RootNavigator />
-        <StatusBar style="auto" />
+        <StatusBar style="light" backgroundColor="#0A0A0A" />
       </SafeAreaProvider>
     </QueryClientProvider>
   );

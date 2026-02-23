@@ -8,7 +8,9 @@ import {
   ScrollView,
   Alert,
   TouchableOpacity,
+  Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Input } from '../../components/common/Input';
@@ -30,13 +32,13 @@ export function RegisterScreen() {
 
   const handleRegister = () => {
     if (!name || !email || !phone || !password) {
-      Alert.alert('Erro', 'Preencha todos os campos');
+      Alert.alert('Atenção', 'Preencha todos os campos');
       return;
     }
     register.mutate(
       { name, email, phone, password, role },
       {
-        onError: () => Alert.alert('Erro', 'Nao foi possivel criar a conta'),
+        onError: () => Alert.alert('Erro', 'Não foi possível criar a conta'),
       },
     );
   };
@@ -49,10 +51,59 @@ export function RegisterScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Criar conta</Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={20} color={Colors.text} />
+          </TouchableOpacity>
+          <View style={styles.logoSmall}>
+            <Image
+              source={require('../../../assets/icon.png')}
+              style={styles.logoImg}
+              resizeMode="contain"
+            />
+          </View>
+        </View>
 
-        <Input label="Nome" placeholder="Seu nome" value={name} onChangeText={setName} />
+        <Text style={styles.title}>Criar conta</Text>
+        <Text style={styles.subtitle}>Junte-se ao FoodIME</Text>
+
+        {/* Role selector */}
+        <View style={styles.roleRow}>
+          <TouchableOpacity
+            style={[styles.roleBtn, role === 'BUYER' && styles.roleBtnActive]}
+            onPress={() => setRole('BUYER')}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="bag-handle-outline"
+              size={20}
+              color={role === 'BUYER' ? Colors.accent : Colors.textLight}
+            />
+            <Text style={[styles.roleText, role === 'BUYER' && styles.roleTextActive]}>
+              Comprador
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.roleBtn, role === 'SELLER' && styles.roleBtnActive]}
+            onPress={() => setRole('SELLER')}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="storefront-outline"
+              size={20}
+              color={role === 'SELLER' ? Colors.accent : Colors.textLight}
+            />
+            <Text style={[styles.roleText, role === 'SELLER' && styles.roleTextActive]}>
+              Vendedor
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Form */}
+        <Input label="Nome" placeholder="Seu nome completo" value={name} onChangeText={setName} />
         <Input
           label="Email"
           placeholder="seu@email.com"
@@ -60,6 +111,7 @@ export function RegisterScreen() {
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
+          autoCorrect={false}
         />
         <Input
           label="Telefone"
@@ -70,51 +122,21 @@ export function RegisterScreen() {
         />
         <Input
           label="Senha"
-          placeholder="Minimo 6 caracteres"
+          placeholder="Mínimo 6 caracteres"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
         />
 
-        <Text style={styles.roleLabel}>Eu sou:</Text>
-        <View style={styles.roleRow}>
-          <TouchableOpacity
-            style={[styles.roleBtn, role === 'BUYER' && styles.roleBtnActive]}
-            onPress={() => setRole('BUYER')}
-          >
-            <Text
-              style={[
-                styles.roleText,
-                role === 'BUYER' && styles.roleTextActive,
-              ]}
-            >
-              Comprador
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.roleBtn, role === 'SELLER' && styles.roleBtnActive]}
-            onPress={() => setRole('SELLER')}
-          >
-            <Text
-              style={[
-                styles.roleText,
-                role === 'SELLER' && styles.roleTextActive,
-              ]}
-            >
-              Vendedor
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         <Button
-          title="Cadastrar"
+          title="Criar conta"
           onPress={handleRegister}
           loading={register.isPending}
           style={{ marginTop: 8 }}
         />
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Ja tem conta? </Text>
+          <Text style={styles.footerText}>Já tem conta? </Text>
           <Text style={styles.link} onPress={() => navigation.goBack()}>
             Entrar
           </Text>
@@ -131,21 +153,47 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
+    padding: 28,
+    paddingTop: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 32,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+  },
+  logoSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  logoImg: {
+    width: 40,
+    height: 40,
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Colors.text,
-    marginBottom: 32,
-    textAlign: 'center',
+    marginBottom: 6,
   },
-  roleLabel: {
+  subtitle: {
     fontSize: 14,
-    fontWeight: '500',
-    color: Colors.text,
-    marginBottom: 8,
+    color: Colors.textSecondary,
+    marginBottom: 28,
   },
   roleRow: {
     flexDirection: 'row',
@@ -154,36 +202,38 @@ const styles = StyleSheet.create({
   },
   roleBtn: {
     flex: 1,
-    height: 44,
+    height: 64,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    backgroundColor: Colors.surface,
   },
   roleBtnActive: {
     borderColor: Colors.primary,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: 'rgba(109, 124, 58, 0.1)',
   },
   roleText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textLight,
   },
   roleTextActive: {
-    color: Colors.primary,
+    color: Colors.accent,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: 28,
   },
   footerText: {
     color: Colors.textSecondary,
     fontSize: 14,
   },
   link: {
-    color: Colors.primary,
+    color: Colors.accent,
     fontSize: 14,
     fontWeight: '600',
   },

@@ -1,8 +1,16 @@
 import React from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useStores } from '../../hooks/useStores';
 import { LoadingState } from '../../components/common/LoadingState';
 import { ErrorState } from '../../components/common/ErrorState';
@@ -23,7 +31,7 @@ export function HomeScreen() {
     <TouchableOpacity
       style={styles.card}
       onPress={() => navigation.navigate('Store', { storeId: item.id })}
-      activeOpacity={0.7}
+      activeOpacity={0.75}
     >
       {item.imageUrl ? (
         <Image source={{ uri: item.imageUrl }} style={styles.image} />
@@ -39,24 +47,53 @@ export function HomeScreen() {
         <Text style={styles.storeDesc} numberOfLines={2}>
           {item.description}
         </Text>
-        <Text style={styles.productCount}>
-          {item.products?.length || 0} produtos
-        </Text>
+        <View style={styles.cardFooter}>
+          <View style={styles.productCountWrap}>
+            <Ionicons name="fast-food-outline" size={12} color={Colors.textLight} />
+            <Text style={styles.productCount}>
+              {item.products?.length || 0} produtos
+            </Text>
+          </View>
+          <View style={styles.openBadge}>
+            <View style={styles.openDot} />
+            <Text style={styles.openText}>Aberto</Text>
+          </View>
+        </View>
+      </View>
+      <View style={styles.arrow}>
+        <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
       </View>
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>FoodIME</Text>
-      <Text style={styles.subheader}>Vendedores abertos</Text>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.appName}>FoodIME</Text>
+          <Text style={styles.subheader}>Vendedores abertos agora</Text>
+        </View>
+        <View style={styles.logoSmall}>
+          <Image
+            source={require('../../../assets/icon.png')}
+            style={styles.logoImg}
+            resizeMode="contain"
+          />
+        </View>
+      </View>
+
       <FlatList
         data={stores}
         keyExtractor={(item) => item.id}
         renderItem={renderStore}
         contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <Text style={styles.empty}>Nenhum vendedor aberto no momento</Text>
+          <View style={styles.emptyWrap}>
+            <Ionicons name="storefront-outline" size={48} color={Colors.textLight} />
+            <Text style={styles.emptyTitle}>Nenhum vendedor aberto</Text>
+            <Text style={styles.emptySubtitle}>Volte mais tarde</Text>
+          </View>
         }
       />
     </SafeAreaView>
@@ -69,70 +106,131 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 8,
+    paddingBottom: 16,
+  },
+  appName: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: Colors.accent,
+    letterSpacing: 0.5,
   },
   subheader: {
-    fontSize: 16,
+    fontSize: 13,
     color: Colors.textSecondary,
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    marginTop: 4,
+    marginTop: 2,
   },
-  list: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  card: {
-    flexDirection: 'row',
-    backgroundColor: Colors.white,
-    borderRadius: 16,
-    marginBottom: 12,
+  logoSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  logoImg: {
+    width: 40,
+    height: 40,
+  },
+  list: {
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  card: {
+    flexDirection: 'row',
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
   image: {
-    width: 100,
-    height: 100,
+    width: 88,
+    height: 88,
   },
   placeholder: {
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primaryDark,
     alignItems: 'center',
     justifyContent: 'center',
   },
   placeholderText: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '700',
-    color: Colors.white,
+    color: Colors.accent,
   },
   cardContent: {
     flex: 1,
     padding: 12,
     justifyContent: 'center',
+    gap: 4,
   },
   storeName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: Colors.text,
   },
   storeDesc: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 4,
-  },
-  productCount: {
     fontSize: 12,
-    color: Colors.textLight,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: 6,
   },
-  empty: {
-    textAlign: 'center',
+  productCountWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  productCount: {
+    fontSize: 11,
+    color: Colors.textLight,
+  },
+  openBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(91, 148, 72, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  openDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: Colors.success,
+  },
+  openText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.success,
+  },
+  arrow: {
+    paddingRight: 12,
+  },
+  emptyWrap: {
+    alignItems: 'center',
+    marginTop: 64,
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     color: Colors.textSecondary,
-    marginTop: 40,
-    fontSize: 15,
+    marginTop: 8,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: Colors.textLight,
   },
 });

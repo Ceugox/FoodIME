@@ -1,0 +1,91 @@
+'use client';
+import { useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useLogin } from '@/hooks/useAuth';
+
+export default function LoginPage() {
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const login = useLogin();
+  const router = useRouter();
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    try {
+      const result = await login.mutateAsync(form);
+      const role = result.data.user.role;
+      router.replace(role === 'SELLER' ? '/dashboard' : '/home');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Email ou senha incorretos');
+    }
+  }
+
+  const inputClass = 'w-full h-12 bg-surface border border-border rounded-2xl px-4 text-text placeholder:text-text-light focus:border-primary/60 outline-none text-sm transition-colors';
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="h-16 w-[118px] rounded-2xl overflow-hidden border border-border mb-4 flex items-center justify-center bg-surface">
+            <Image src="/logo.png" alt="FoodIME" width={118} height={64} className="object-contain w-full h-full" />
+          </div>
+          <h1 className="text-3xl font-extrabold text-accent tracking-wide">FoodIME</h1>
+          <p className="text-text-secondary text-sm mt-1">Entre na sua conta</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Email</label>
+            <input
+              type="email"
+              className={inputClass}
+              placeholder="seu@email.com"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Senha</label>
+            <input
+              type="password"
+              className={inputClass}
+              placeholder="••••••••"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              required
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 bg-error/10 border border-error/30 rounded-xl px-4 py-2.5">
+              <svg className="w-4 h-4 text-error flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.834-1.964-.834-2.732 0L3.072 16.5C2.302 18.333 3.264 19 4.804 19z" />
+              </svg>
+              <p className="text-error text-xs">{error}</p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={login.isPending}
+            className="w-full h-12 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-2xl font-bold transition-colors mt-2"
+          >
+            {login.isPending ? 'Entrando...' : 'Entrar'}
+          </button>
+        </form>
+
+        <p className="text-center text-text-secondary text-sm mt-6">
+          Não tem conta?{' '}
+          <Link href="/register" className="text-accent font-semibold hover:underline">
+            Cadastre-se
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}

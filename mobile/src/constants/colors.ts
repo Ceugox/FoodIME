@@ -1,17 +1,26 @@
 export const Colors = {
-  primary: '#F97316',
-  primaryLight: '#FDBA74',
-  primaryDark: '#EA580C',
-  secondary: '#1E293B',
-  background: '#FFFFFF',
-  surface: '#F8FAFC',
-  border: '#E2E8F0',
-  text: '#1E293B',
-  textSecondary: '#64748B',
-  textLight: '#94A3B8',
-  success: '#22C55E',
-  error: '#EF4444',
-  warning: '#EAB308',
+  // Olive green palette
+  primary: '#6D7C3A',
+  primaryLight: '#8FA84E',
+  primaryDark: '#4E5B29',
+  accent: '#B8CC6E',
+
+  // Dark backgrounds
+  background: '#0A0A0A',
+  surface: '#141414',
+  surface2: '#1E1E1E',
+  border: '#252525',
+
+  // Text
+  text: '#E8E6D5',
+  textSecondary: '#9A9884',
+  textLight: '#5A5848',
+
+  // Status
+  success: '#5B9448',
+  error: '#C75050',
+  warning: '#C5A044',
+
   white: '#FFFFFF',
   black: '#000000',
 };

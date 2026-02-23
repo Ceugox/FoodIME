@@ -7,6 +7,7 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,13 +27,13 @@ export function LoginScreen() {
 
   const handleLogin = () => {
     if (!email || !password) {
-      Alert.alert('Erro', 'Preencha todos os campos');
+      Alert.alert('Atenção', 'Preencha todos os campos');
       return;
     }
     login.mutate(
       { email, password },
       {
-        onError: () => Alert.alert('Erro', 'Credenciais invalidas'),
+        onError: () => Alert.alert('Acesso negado', 'Email ou senha incorretos'),
       },
     );
   };
@@ -45,40 +46,49 @@ export function LoginScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <Text style={styles.logo}>FoodIME</Text>
-          <Text style={styles.subtitle}>Comida boa, perto de voce</Text>
+        <View style={styles.brand}>
+          <View style={styles.logoWrap}>
+            <Image
+              source={require('../../../assets/icon.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
+          <Text style={styles.appName}>FoodIME</Text>
+          <Text style={styles.tagline}>Comida boa, perto de você</Text>
         </View>
 
-        <Input
-          label="Email"
-          placeholder="seu@email.com"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <Input
-          label="Senha"
-          placeholder="Sua senha"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+        <View style={styles.form}>
+          <Input
+            label="Email"
+            placeholder="seu@email.com"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Input
+            label="Senha"
+            placeholder="Sua senha"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
 
-        <Button
-          title="Entrar"
-          onPress={handleLogin}
-          loading={login.isPending}
-        />
+          <Button
+            title="Entrar"
+            onPress={handleLogin}
+            loading={login.isPending}
+            style={{ marginTop: 8 }}
+          />
+        </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Nao tem conta? </Text>
-          <Text
-            style={styles.link}
-            onPress={() => navigation.navigate('Register')}
-          >
+          <Text style={styles.footerText}>Não tem conta? </Text>
+          <Text style={styles.link} onPress={() => navigation.navigate('Register')}>
             Cadastre-se
           </Text>
         </View>
@@ -95,33 +105,53 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
+    padding: 28,
   },
-  header: {
+  brand: {
     alignItems: 'center',
     marginBottom: 48,
   },
-  logo: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: Colors.primary,
+  logoWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 24,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    overflow: 'hidden',
   },
-  subtitle: {
-    fontSize: 16,
+  logo: {
+    width: 88,
+    height: 88,
+  },
+  appName: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: Colors.accent,
+    letterSpacing: 1,
+  },
+  tagline: {
+    fontSize: 14,
     color: Colors.textSecondary,
-    marginTop: 8,
+    marginTop: 6,
+  },
+  form: {
+    marginBottom: 8,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: 28,
   },
   footerText: {
     color: Colors.textSecondary,
     fontSize: 14,
   },
   link: {
-    color: Colors.primary,
+    color: Colors.accent,
     fontSize: 14,
     fontWeight: '600',
   },

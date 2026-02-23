@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import { Button } from './Button';
 
@@ -14,7 +15,9 @@ export function ErrorState({
 }: ErrorStateProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.emoji}>:(</Text>
+      <View style={styles.iconWrap}>
+        <Ionicons name="alert-circle-outline" size={48} color={Colors.error} />
+      </View>
       <Text style={styles.message}>{message}</Text>
       {onRetry && (
         <Button title="Tentar novamente" onPress={onRetry} variant="outline" />
@@ -29,17 +32,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.background,
-    padding: 24,
+    padding: 32,
   },
-  emoji: {
-    fontSize: 48,
+  iconWrap: {
     marginBottom: 16,
-    color: Colors.textLight,
+    opacity: 0.8,
   },
   message: {
-    fontSize: 16,
+    fontSize: 15,
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 28,
+    lineHeight: 22,
   },
 });

@@ -11,7 +11,7 @@ import { Colors } from '../../constants/colors';
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   loading?: boolean;
   disabled?: boolean;
   style?: ViewStyle;
@@ -34,22 +34,24 @@ export function Button({
         variant === 'primary' && styles.primary,
         variant === 'secondary' && styles.secondary,
         variant === 'outline' && styles.outline,
+        variant === 'ghost' && styles.ghost,
         isDisabled && styles.disabled,
         style,
       ]}
       onPress={onPress}
       disabled={isDisabled}
-      activeOpacity={0.7}
+      activeOpacity={0.75}
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'outline' ? Colors.primary : Colors.white}
+          color={variant === 'outline' || variant === 'ghost' ? Colors.primary : Colors.white}
         />
       ) : (
         <Text
           style={[
             styles.text,
             variant === 'outline' && styles.outlineText,
+            variant === 'ghost' && styles.ghostText,
             variant === 'secondary' && styles.secondaryText,
           ]}
         >
@@ -62,8 +64,8 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    height: 48,
-    borderRadius: 12,
+    height: 52,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
@@ -72,25 +74,32 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   secondary: {
-    backgroundColor: Colors.secondary,
+    backgroundColor: Colors.surface2,
   },
   outline: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
     borderColor: Colors.primary,
   },
+  ghost: {
+    backgroundColor: 'transparent',
+  },
   disabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
   text: {
     color: Colors.white,
     fontSize: 16,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
   outlineText: {
     color: Colors.primary,
   },
+  ghostText: {
+    color: Colors.textSecondary,
+  },
   secondaryText: {
-    color: Colors.white,
+    color: Colors.text,
   },
 });

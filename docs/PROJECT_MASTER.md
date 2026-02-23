@@ -489,15 +489,15 @@ ADMIN_PASSWORD_HASH=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
-### [2026-02-22] Aprovação imediata de cartão de crédito
-- **Problema:** Pagamento com cartão ficava travado em "Aguardando pagamento..." porque o backend sempre salvava status `PROCESSING` e esperava o webhook, mas o Mercado Pago aprova cartão de crédito instantaneamente na resposta da API.
-- **Solução:** `payments.service.ts` agora verifica `result.status` após criar pagamento com cartão. Se `approved`, confirma o pedido imediatamente (decrementa estoque, muda status para PAID, notifica vendedor). Se `rejected`, lança erro com mensagem específica. Se outro status (`in_process`), segue o fluxo normal via webhook.
-- **Arquivos alterados:** `backend/src/modules/payments/payments.service.ts`, `backend/src/modules/payments/mercadopago.service.ts`
+### [2026-02-23] Web PWA criado — buyer e seller
+- **Problema:** App só existia como mobile (React Native + Expo). Precisava de versão web responsiva + PWA instalável para buyers e sellers.
+- **Solução:** Criado `web/` com Next.js 15 App Router, Tailwind (paleta dark olive idêntica ao mobile), next-pwa com service worker, middleware de rotas por JWT cookie, TanStack Query + Zustand (localStorage), Socket.io para orders em tempo real do seller. Todas as páginas: login, register, home, store/[id], cart, checkout PIX, orders, profile (buyer) e dashboard, orders, products, store (seller).
+- **Arquivos criados:** `web/` (diretório completo — package.json, next.config.ts, tailwind.config.ts, src/app/**, src/components/**, src/hooks/**, src/services/**, src/store/**, src/types/**, src/middleware.ts)
 
-### [2026-02-22] Mensagens de erro específicas por rejeição de cartão
-- **Problema:** Qualquer rejeição de cartão mostrava mensagem genérica "Falha ao processar pagamento".
-- **Solução:** Mapeamento de `status_detail` do Mercado Pago para mensagens em português (saldo insuficiente, CVV inválido, cartão desabilitado, etc.) via método `getCardRejectionMessage()`. Mobile exibe a mensagem retornada pelo backend no Alert.
-- **Arquivos alterados:** `backend/src/modules/payments/payments.service.ts`, `mobile/src/screens/buyer/CheckoutScreen.tsx`
+### [2026-02-22] Aprovação imediata de cartão de crédito + erros explícitos
+- **Problema:** Pagamento com cartão ficava em `PROCESSING`. Qualquer rejeição mostrava mensagem genérica. Criar produto sem loja disparava erro interno P2025.
+- **Solução:** `payments.service.ts` verifica `result.status` imediatamente. Mapeamento de `status_detail` para português. `PrismaExceptionFilter` global (P2025→404, P2002→409). Produto sem loja mostra mensagem explícita.
+- **Arquivos alterados:** `backend/src/modules/payments/payments.service.ts`, `backend/src/modules/products/products.service.ts`, `backend/src/common/filters/prisma-exception.filter.ts`, `backend/src/main.ts`
 
 ---
 

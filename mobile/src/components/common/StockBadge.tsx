@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors } from '../../constants/colors';
 
 const STOCK_WARNING_THRESHOLD = 10;
 
@@ -12,7 +11,7 @@ export function StockBadge({ stockQty }: StockBadgeProps) {
   if (stockQty === 0) {
     return (
       <View style={[styles.badge, styles.unavailable]}>
-        <Text style={styles.unavailableText}>Indisponivel</Text>
+        <Text style={styles.unavailableText}>Indisponível</Text>
       </View>
     );
   }
@@ -20,7 +19,7 @@ export function StockBadge({ stockQty }: StockBadgeProps) {
   if (stockQty < STOCK_WARNING_THRESHOLD) {
     return (
       <View style={[styles.badge, styles.warning]}>
-        <Text style={styles.warningText}>Ultimas unidades</Text>
+        <Text style={styles.warningText}>Últimas unidades</Text>
       </View>
     );
   }
@@ -31,24 +30,28 @@ export function StockBadge({ stockQty }: StockBadgeProps) {
 const styles = StyleSheet.create({
   badge: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 6,
     alignSelf: 'flex-start',
   },
   warning: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: 'rgba(197, 160, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(197, 160, 68, 0.4)',
   },
   warningText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#D97706',
+    color: '#C5A044',
   },
   unavailable: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: 'rgba(199, 80, 80, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(199, 80, 80, 0.4)',
   },
   unavailableText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.error,
+    color: '#C75050',
   },
 });
