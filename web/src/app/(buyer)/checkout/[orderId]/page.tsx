@@ -6,6 +6,8 @@ import { useOrder } from '@/hooks/useOrders';
 import { useInitiatePayment, usePaymentByOrder } from '@/hooks/usePayment';
 import { useCartStore } from '@/store/cartStore';
 import { formatCurrency } from '@/lib/utils';
+import { CreditCardForm, type CardFormData } from '@/components/payment/credit-card-form';
+import { createCardToken } from '@/services/mercadopago.service';
 
 const PIX_EXPIRY_SECONDS = 15 * 60;
 
@@ -36,6 +38,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
   const [tab, setTab] = useState<'PIX' | 'CARD'>('PIX');
   const [pixData, setPixData] = useState<{ qrCode: string; base64?: string; startedAt: number } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [cardLoading, setCardLoading] = useState(false);
+  const [cardError, setCardError] = useState('');
   const clearCart = useCartStore((s) => s.clear);
 
   const { data: order, isLoading } = useOrder(orderId);
@@ -49,6 +53,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
     if (payment?.status === 'PAID' || order?.status === 'PAID') {
       clearCart();
       router.replace(`/orders`);
+    }
+    if (payment?.status === 'FAILED') {
+      setPollPayment(false);
+      setCardError('Pagamento falhou. Tente novamente.');
     }
   }, [payment?.status, order?.status, router, clearCart]);
 
@@ -66,6 +74,23 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
     await navigator.clipboard.writeText(pixData.qrCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
+  }
+
+  async function handleCardSubmit(cardData: CardFormData) {
+    setCardLoading(true);
+    setCardError('');
+    try {
+      const cardToken = await createCardToken(cardData);
+      await initiate.mutateAsync({ orderId, method: 'CREDIT_CARD', cardToken });
+      setPollPayment(true);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        'Falha ao processar pagamento com cartao';
+      setCardError(msg);
+    } finally {
+      setCardLoading(false);
+    }
   }
 
   if (isLoading) {
@@ -146,13 +171,19 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
           )}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-12 gap-3">
-          <svg className="w-12 h-12 text-text-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
-          </svg>
-          <p className="text-text-secondary text-sm text-center">
-            Pagamento via cartão de crédito em breve disponível no app web.
-          </p>
+        <div>
+          {cardError && (
+            <div className="flex items-center gap-2 bg-error/10 border border-error/30 rounded-xl px-4 py-2.5 mb-3">
+              <svg className="w-4 h-4 text-error flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.834-1.964-.834-2.732 0L3.072 16.5C2.302 18.333 3.264 19 4.804 19z" />
+              </svg>
+              <p className="text-error text-xs">{cardError}</p>
+            </div>
+          )}
+          <CreditCardForm
+            onSubmit={handleCardSubmit}
+            loading={cardLoading || initiate.isPending}
+          />
         </div>
       )}
     </div>
