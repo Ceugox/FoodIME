@@ -16,7 +16,7 @@ function ProductCard({ product, storeName }: { product: Product; storeName: stri
   const items = useCartStore((s) => s.items);
   const qty = items.find((i) => i.product.id === product.id)?.quantity || 0;
   const updateQuantity = useCartStore((s) => s.updateQuantity);
-  const unavailable = !product.isAvailable || product.stockQty === 0;
+  const unavailable = product.isAvailable === false || product.stockQty === 0;
 
   return (
     <div className={`bg-surface rounded-2xl border border-border overflow-hidden ${unavailable ? 'opacity-60' : ''}`}>
