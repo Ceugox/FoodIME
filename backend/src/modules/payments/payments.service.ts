@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MercadoPagoService } from './mercadopago.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
@@ -239,11 +239,21 @@ export class PaymentsService {
     return messages[statusDetail ?? ''] ?? 'Pagamento recusado. Verifique os dados do cartão e tente novamente.';
   }
 
-  async getPaymentByOrder(orderId: string) {
+  async getPaymentByOrder(orderId: string, user: UserPayload) {
     const payment = await this.prisma.payment.findUniqueOrThrow({
       where: { orderId },
+      include: {
+        order: { select: { buyerId: true, store: { select: { ownerId: true } } } },
+      },
     });
 
-    return { data: payment };
+    const isBuyer = payment.order.buyerId === user.id;
+    const isSeller = payment.order.store.ownerId === user.id;
+    if (!isBuyer && !isSeller && user.role !== 'ADMIN') {
+      throw new ForbiddenException('Acesso negado');
+    }
+
+    const { order: _, ...paymentData } = payment;
+    return { data: paymentData };
   }
 }

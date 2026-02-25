@@ -28,7 +28,10 @@ export class PaymentsController {
   }
 
   @Get('order/:orderId')
-  getPaymentByOrder(@Param('orderId') orderId: string) {
-    return this.paymentsService.getPaymentByOrder(orderId);
+  getPaymentByOrder(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: UserPayload,
+  ) {
+    return this.paymentsService.getPaymentByOrder(orderId, user);
   }
 }

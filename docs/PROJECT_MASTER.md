@@ -489,15 +489,15 @@ ADMIN_PASSWORD_HASH=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
+### [2026-02-25] SPRINT A: Security hardening, índices DB, Docker, CI/CD
+- **Problema:** Múltiplas vulnerabilidades bloqueando deploy: CORS aberto (`*`), JWT secrets com fallback hardcoded, sem rate limiting, sem Helmet, GET /payments/order/:id sem ownership check, WebSocket sem autenticação, sem validação de env no startup, webhook sem proteção contra replay, sem revogação de tokens, sem índices, sem Docker, sem RLS.
+- **Solução:** CORS restrito via `CORS_ORIGINS` env; Helmet; ThrottlerModule (60 req/min global, 5 em login/register, 30 no webhook); Joi validation no startup; JWT sem fallback; ownership check em payment; WebSocket autenticado via JWT no handshake; webhook com timestamp (5min) + dedup requestId; tabela `RefreshToken` + `POST /auth/logout` + token rotation; índices em Order/OrderItem/Payment/Product; RLS em todas as tabelas Supabase; Dockerfile multi-stage; docker-compose.yml; CI/CD com type-check, Prisma diff, Docker→GHCR, web.yml, deploy.yml manual. Senha mínima 8 chars. Health `GET /health`.
+- **Arquivos:** `main.ts`, `app.module.ts`, `app.controller.ts`, `jwt.strategy.ts`, `jwt-refresh.strategy.ts`, `auth.controller.ts`, `auth.service.ts`, `register.dto.ts`, `payments.controller.ts`, `payments.service.ts`, `webhook.controller.ts`, `notifications.gateway.ts`, `notifications.module.ts`, `schema.prisma`, `Dockerfile`, `.dockerignore`, `docker-compose.yml`, `backend.yml`, `web.yml`, `deploy.yml`
+
 ### [2026-02-24] Redesign visual completo — paleta warm + tipografia artesanal
 - **Problema:** Frontend web (buyer, seller) e admin usavam paleta olive/lime fria com tipografia genérica (Inter). Visual "AI slop" sem personalidade.
 - **Solução:** Redesign completo de 32 arquivos em 6 fases. Nova paleta dark warm (burnt orange #D4752E, gold #F0C05A, brown backgrounds). Tipografia DM Serif Display (headings) + DM Sans (body). Animações: fadeSlideUp com stagger cascata, scaleIn, warmPulse. Sombras quentes (shadow-warm, shadow-glow). BottomNav com frosted glass + dot indicator. Admin migrado de inline styles para Tailwind com paleta light warm (#FAF6F1). Rename global text-text-light → text-text-muted.
-- **Arquivos alterados:** `web/tailwind.config.ts`, `web/src/app/globals.css`, `web/src/app/layout.tsx`, `admin/tailwind.config.ts`, `admin/src/app/globals.css`, `admin/src/app/layout.tsx`, 6 componentes web (BottomNav, Skeleton, ErrorState, StockBadge, LoadingSkeleton, credit-card-form), 2 auth (login, register), 6 buyer (home, store, cart, checkout, orders, profile), 4 seller (dashboard, orders, products, store), 8 admin (Sidebar, AdminLayout, login, dashboard, users, transactions, sellers/[id], buyers/[id]), `web/src/app/offline/page.tsx`
-
-### [2026-02-23] Web PWA criado — buyer e seller
-- **Problema:** App só existia como mobile (React Native + Expo). Precisava de versão web responsiva + PWA instalável para buyers e sellers.
-- **Solução:** Criado `web/` com Next.js 15 App Router, Tailwind (paleta dark olive idêntica ao mobile), next-pwa com service worker, middleware de rotas por JWT cookie, TanStack Query + Zustand (localStorage), Socket.io para orders em tempo real do seller. Todas as páginas: login, register, home, store/[id], cart, checkout PIX, orders, profile (buyer) e dashboard, orders, products, store (seller).
-- **Arquivos criados:** `web/` (diretório completo — package.json, next.config.ts, tailwind.config.ts, src/app/**, src/components/**, src/hooks/**, src/services/**, src/store/**, src/types/**, src/middleware.ts)
+- **Arquivos:** `web/tailwind.config.ts`, `web/src/app/globals.css`, `web/src/app/layout.tsx`, `admin/tailwind.config.ts`, `admin/src/app/globals.css`, `admin/src/app/layout.tsx`, 6 componentes web, 2 auth, 6 buyer, 4 seller, 8 admin, `web/src/app/offline/page.tsx`
 
 ---
 

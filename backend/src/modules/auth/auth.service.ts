@@ -85,7 +85,21 @@ export class AuthService {
     };
   }
 
-  async refresh(userPayload: UserPayload) {
+  async refresh(userPayload: UserPayload, rawToken?: string) {
+    if (rawToken) {
+      const stored = await this.prisma.refreshToken.findFirst({
+        where: {
+          token: rawToken,
+          userId: userPayload.id,
+          expiresAt: { gt: new Date() },
+        },
+      });
+      if (!stored) {
+        throw new UnauthorizedException('Refresh token inválido ou expirado');
+      }
+      await this.prisma.refreshToken.delete({ where: { id: stored.id } });
+    }
+
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userPayload.id },
     });
@@ -97,6 +111,17 @@ export class AuthService {
     });
 
     return { data: tokens };
+  }
+
+  async logout(userId: string, refreshToken?: string) {
+    if (refreshToken) {
+      await this.prisma.refreshToken.deleteMany({
+        where: { userId, token: refreshToken },
+      });
+    } else {
+      await this.prisma.refreshToken.deleteMany({ where: { userId } });
+    }
+    return { message: 'Logout realizado com sucesso' };
   }
 
   async getProfile(userPayload: UserPayload) {
@@ -119,6 +144,12 @@ export class AuthService {
         expiresIn: JWT_REFRESH_EXPIRY,
       }),
     ]);
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    await this.prisma.refreshToken.create({
+      data: { token: refreshToken, userId: payload.id, expiresAt },
+    });
 
     return { accessToken, refreshToken };
   }

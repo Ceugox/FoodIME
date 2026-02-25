@@ -12,30 +12,42 @@ datasource db {
 }
 
 model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  password      String
+  name          String
+  phone         String
+  role          Role           @default(BUYER)
+  status        UserStatus     @default(ACTIVE)
+  store         Store?
+  orders        Order[]
+  refreshTokens RefreshToken[]
+  createdAt     DateTime       @default(now())
+}
+
+model RefreshToken {
   id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  phone     String
-  role      Role     @default(BUYER)
-  store     Store?
-  orders    Order[]
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
   createdAt DateTime @default(now())
 }
 
 model Store {
-  id          String    @id @default(uuid())
-  owner       User      @relation(fields: [ownerId], references: [id])
-  ownerId     String    @unique
-  name        String
-  description String
-  imageUrl    String?
-  whatsapp    String
-  pixKey      String
+  id             String    @id @default(uuid())
+  owner          User      @relation(fields: [ownerId], references: [id])
+  ownerId        String    @unique
+  name           String
+  description    String
+  imageUrl       String?
+  whatsapp       String
+  pixKey         String
   commissionRate Decimal   @default(0.10)
   isOpen         Boolean   @default(false)
-  products    Product[]
-  orders      Order[]
+  products       Product[]
+  orders         Order[]
+  payouts        Payout[]
 }
 
 model Product {
@@ -48,6 +60,9 @@ model Product {
   stockQty    Int
   isAvailable Boolean     @default(true)
   orderItems  OrderItem[]
+
+  @@index([storeId])
+  @@index([isAvailable])
 }
 
 model Order {
@@ -62,6 +77,11 @@ model Order {
   code        String      @unique
   totalAmount Decimal
   createdAt   DateTime    @default(now())
+
+  @@index([buyerId])
+  @@index([storeId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -72,6 +92,9 @@ model OrderItem {
   productId       String
   quantity        Int
   priceAtPurchase Decimal
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 model Payment {
@@ -85,12 +108,42 @@ model Payment {
   netAmount   Decimal
   status      PaymentStatus @default(PROCESSING)
   createdAt   DateTime      @default(now())
+
+  @@index([gatewayTxId])
+  @@index([status])
+}
+
+model Coupon {
+  id         String     @id @default(uuid())
+  code       String     @unique
+  type       CouponType
+  discount   Decimal
+  isActive   Boolean    @default(true)
+  usageLimit Int?
+  usedCount  Int        @default(0)
+  expiresAt  DateTime?
+  createdAt  DateTime   @default(now())
+}
+
+model Payout {
+  id        String   @id @default(uuid())
+  store     Store    @relation(fields: [storeId], references: [id])
+  storeId   String
+  amount    Decimal
+  note      String?
+  createdAt DateTime @default(now())
 }
 
 enum Role {
   BUYER
   SELLER
   ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
 }
 
 enum OrderStatus {
@@ -110,4 +163,9 @@ enum PaymentStatus {
   PAID
   FAILED
   REFUNDED
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED
 }
