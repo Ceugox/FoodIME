@@ -27,7 +27,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || 'Credenciais invalidas');
+        throw new Error(data.message || 'Credenciais inválidas');
       }
 
       if (data.data?.user?.role !== 'ADMIN') {
@@ -44,28 +44,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f8fafc',
-    }}>
-      <div style={{
-        width: 400,
-        background: '#ffffff',
-        borderRadius: 16,
-        padding: 40,
-        border: '1px solid #e2e8f0',
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: '#f97316' }}>FoodIME</h1>
-          <p style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>Painel Administrativo</p>
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="w-[400px] bg-card rounded-2xl p-10 border border-border shadow-sm">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-serif text-primary">FoodIME</h1>
+          <p className="text-muted-foreground text-sm mt-1">Painel Administrativo</p>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: '#1e293b' }}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1.5 text-foreground">
               Email
             </label>
             <input
@@ -73,13 +61,13 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={{ width: '100%' }}
+              className="w-full h-11 rounded-lg border border-input bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none transition-all"
               placeholder="admin@foodime.com"
             />
           </div>
 
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: '#1e293b' }}>
+          <div>
+            <label className="block text-sm font-medium mb-1.5 text-foreground">
               Senha
             </label>
             <input
@@ -87,13 +75,13 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              style={{ width: '100%' }}
+              className="w-full h-11 rounded-lg border border-input bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none transition-all"
               placeholder="••••••••"
             />
           </div>
 
           {error && (
-            <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 16, textAlign: 'center' }}>
+            <p className="text-destructive text-sm text-center bg-destructive/10 rounded-lg py-2 px-3">
               {error}
             </p>
           )}
@@ -101,8 +89,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary"
-            style={{ width: '100%', height: 44, fontSize: 15, fontWeight: 600 }}
+            className="w-full h-11 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-lg font-semibold text-[15px] transition-colors"
           >
             {loading ? 'Entrando...' : 'Entrar'}
           </button>

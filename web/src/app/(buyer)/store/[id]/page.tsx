@@ -11,7 +11,7 @@ import { StockBadge } from '@/components/common/StockBadge';
 import { formatCurrency } from '@/lib/utils';
 import type { Product } from '@/types/models.types';
 
-function ProductCard({ product, storeName }: { product: Product; storeName: string }) {
+function ProductCard({ product, storeName, index }: { product: Product; storeName: string; index: number }) {
   const addItem = useCartStore((s) => s.addItem);
   const items = useCartStore((s) => s.items);
   const qty = items.find((i) => i.product.id === product.id)?.quantity || 0;
@@ -19,29 +19,32 @@ function ProductCard({ product, storeName }: { product: Product; storeName: stri
   const unavailable = product.isAvailable === false || product.stockQty === 0;
 
   return (
-    <div className={`bg-surface rounded-2xl border border-border overflow-hidden ${unavailable ? 'opacity-60' : ''}`}>
+    <div
+      className={`bg-surface rounded-xl border border-border overflow-hidden hover:border-border-hover hover:shadow-warm transition-all animate-slide-up ${unavailable ? 'opacity-60' : ''}`}
+      style={{ animationDelay: `${index * 60}ms` }}
+    >
       <div className="relative h-36 bg-surface-2">
         {product.imageUrl ? (
           <Image src={product.imageUrl} alt={product.name} fill className="object-cover" />
         ) : (
           <div className="h-full flex items-center justify-center">
-            <svg className="w-10 h-10 text-text-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-10 h-10 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
             </svg>
           </div>
         )}
       </div>
       <div className="p-3">
-        <p className="font-bold text-text text-sm">{product.name}</p>
+        <p className="font-serif text-text text-sm">{product.name}</p>
         <div className="flex items-center justify-between mt-1">
-          <p className="text-accent font-bold">{formatCurrency(product.price)}</p>
+          <p className="text-accent font-serif text-base">{formatCurrency(product.price)}</p>
           <StockBadge stockQty={product.stockQty} isAvailable={product.isAvailable} />
         </div>
         {!unavailable && (
           qty === 0 ? (
             <button
               onClick={() => addItem(product, storeName)}
-              className="mt-2 w-full h-9 bg-primary hover:bg-primary-light text-white rounded-xl text-sm font-semibold transition-colors"
+              className="mt-2 w-full h-9 bg-primary hover:bg-primary-light text-white rounded-xl text-sm font-semibold shadow-warm hover:shadow-glow transition-all"
             >
               Adicionar
             </button>
@@ -49,14 +52,14 @@ function ProductCard({ product, storeName }: { product: Product; storeName: stri
             <div className="mt-2 flex items-center justify-between bg-surface-2 rounded-xl px-1">
               <button
                 onClick={() => updateQuantity(product.id, qty - 1)}
-                className="w-9 h-9 flex items-center justify-center text-accent font-bold text-lg"
+                className="w-9 h-9 flex items-center justify-center text-primary font-bold text-lg"
               >
                 −
               </button>
               <span className="text-text font-semibold text-sm">{qty}</span>
               <button
                 onClick={() => addItem(product, storeName)}
-                className="w-9 h-9 flex items-center justify-center text-accent font-bold text-lg"
+                className="w-9 h-9 flex items-center justify-center text-primary font-bold text-lg"
               >
                 +
               </button>
@@ -80,8 +83,8 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
   return (
     <div className="px-5 pt-4 pb-28">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => router.back()} className="w-9 h-9 flex items-center justify-center rounded-xl bg-surface border border-border">
+      <div className="flex items-center gap-3 mb-5 animate-slide-up">
+        <button onClick={() => router.back()} className="w-9 h-9 flex items-center justify-center rounded-xl bg-surface border border-border hover:border-border-hover transition-colors">
           <svg className="w-4 h-4 text-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
@@ -89,7 +92,7 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
         {isLoading ? (
           <div className="h-6 w-40 bg-surface-2 rounded animate-shimmer" />
         ) : (
-          <h1 className="text-lg font-bold text-text">{store?.name}</h1>
+          <h1 className="text-lg font-serif text-text">{store?.name}</h1>
         )}
       </div>
 
@@ -110,8 +113,8 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              {store.products.map((product) => (
-                <ProductCard key={product.id} product={product} storeName={store.name} />
+              {store.products.map((product, i) => (
+                <ProductCard key={product.id} product={product} storeName={store.name} index={i} />
               ))}
             </div>
           )}
@@ -120,16 +123,16 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
 
       {/* Floating cart bar */}
       {showCartBar && (
-        <div className="fixed bottom-20 left-0 right-0 px-5 z-40">
+        <div className="fixed bottom-20 left-0 right-0 px-5 z-40 animate-slide-up">
           <Link href="/cart">
-            <div className="max-w-2xl mx-auto bg-primary rounded-2xl p-4 flex items-center justify-between shadow-lg">
+            <div className="max-w-2xl mx-auto bg-primary rounded-xl p-4 flex items-center justify-between shadow-glow">
               <div className="flex items-center gap-2">
                 <span className="bg-white/20 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">
                   {itemCount}
                 </span>
                 <span className="text-white font-semibold text-sm">Ver carrinho</span>
               </div>
-              <span className="text-white font-bold">{formatCurrency(cartTotal)}</span>
+              <span className="text-white font-serif text-lg">{formatCurrency(cartTotal)}</span>
             </div>
           </Link>
         </div>

@@ -23,20 +23,20 @@ export default function RegisterPage() {
     }
   }
 
-  const inputClass = 'w-full h-12 bg-surface border border-border rounded-2xl px-4 text-text placeholder:text-text-light focus:border-primary/60 outline-none text-sm transition-colors';
+  const inputClass = 'w-full h-12 bg-surface-2 border border-border rounded-xl px-4 text-text placeholder:text-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none text-sm transition-all';
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 py-10">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm animate-slide-up">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} className="w-9 h-9 flex items-center justify-center rounded-xl bg-surface border border-border">
+          <button onClick={() => router.back()} className="w-9 h-9 flex items-center justify-center rounded-xl bg-surface border border-border hover:border-border-hover transition-colors">
             <svg className="w-4 h-4 text-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
             </svg>
           </button>
           <div>
-            <h1 className="text-xl font-bold text-text">Criar conta</h1>
+            <h1 className="text-xl font-serif text-text">Criar conta</h1>
             <p className="text-text-secondary text-xs">FoodIME</p>
           </div>
           <div className="ml-auto h-8 w-[59px] rounded-xl overflow-hidden border border-border flex items-center justify-center bg-surface">
@@ -45,16 +45,16 @@ export default function RegisterPage() {
         </div>
 
         {/* Role selector */}
-        <div className="flex gap-2 mb-4">
-          {(['BUYER', 'SELLER'] as const).map((role) => (
+        <div className="flex gap-2 mb-4 animate-stagger">
+          {(['BUYER', 'SELLER'] as const).map((role, i) => (
             <button
               key={role}
               type="button"
               onClick={() => setForm({ ...form, role })}
-              className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl border text-sm font-semibold transition-colors ${
+              className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border text-sm font-semibold transition-all stagger-${i + 1} ${
                 form.role === role
-                  ? 'border-primary bg-primary/20 text-accent'
-                  : 'border-border bg-surface text-text-secondary'
+                  ? 'border-primary bg-primary/15 text-primary shadow-glow'
+                  : 'border-border bg-surface text-text-secondary hover:border-border-hover'
               }`}
             >
               {role === 'BUYER' ? (
@@ -90,7 +90,7 @@ export default function RegisterPage() {
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 bg-error/10 border border-error/30 rounded-xl px-4 py-2.5">
+            <div className="flex items-center gap-2 bg-error/10 border border-error/30 rounded-xl px-4 py-2.5 animate-scale-in">
               <svg className="w-4 h-4 text-error flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.834-1.964-.834-2.732 0L3.072 16.5C2.302 18.333 3.264 19 4.804 19z" />
               </svg>
@@ -101,7 +101,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={register.isPending}
-            className="w-full h-12 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-2xl font-bold transition-colors mt-2"
+            className="w-full h-12 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-xl font-bold shadow-warm hover:shadow-glow transition-all mt-2"
           >
             {register.isPending ? 'Criando conta...' : 'Criar conta'}
           </button>

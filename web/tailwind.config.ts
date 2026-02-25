@@ -10,37 +10,50 @@ const config: Config = {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#6D7C3A',
-          light: '#8FA84E',
-          dark: '#4E5B29',
+          DEFAULT: '#D4752E',
+          light: '#E8923F',
+          dark: '#B85E1E',
         },
-        accent: '#B8CC6E',
-        background: '#0A0A0A',
+        accent: '#F0C05A',
+        background: '#1A1310',
         surface: {
-          DEFAULT: '#141414',
-          2: '#1E1E1E',
+          DEFAULT: '#241E19',
+          2: '#2E2620',
         },
-        border: '#252525',
+        border: {
+          DEFAULT: '#3D332A',
+          hover: '#5A4A3D',
+        },
         text: {
-          DEFAULT: '#E8E6D5',
-          secondary: '#9A9884',
-          light: '#5A5848',
+          DEFAULT: '#F5EDE4',
+          secondary: '#A89A8A',
+          muted: '#6D5F51',
         },
-        success: '#5B9448',
-        error: '#C75050',
-        warning: '#C5A044',
+        success: '#5DAA4F',
+        error: '#D44D4D',
+        warning: '#D4A73C',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        serif: ['DM Serif Display', 'Georgia', 'serif'],
+        sans: ['DM Sans', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
+        xl: '0.75rem',
         '2xl': '1rem',
         '3xl': '1.5rem',
+      },
+      boxShadow: {
+        'warm-sm': '0 1px 3px rgba(42,31,22,0.4)',
+        warm: '0 4px 12px rgba(42,31,22,0.5)',
+        'warm-lg': '0 8px 24px rgba(42,31,22,0.6)',
+        glow: '0 4px 20px rgba(212,117,46,0.25)',
       },
       animation: {
         shimmer: 'shimmer 1.5s infinite',
         'fade-in': 'fadeIn 0.2s ease-out',
-        'slide-up': 'slideUp 0.3s ease-out',
+        'slide-up': 'fadeSlideUp 0.4s ease-out both',
+        'scale-in': 'scaleIn 0.3s ease-out both',
+        'warm-pulse': 'warmPulse 2s ease-in-out infinite',
       },
       keyframes: {
         shimmer: {
@@ -51,9 +64,17 @@ const config: Config = {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
-        slideUp: {
-          from: { transform: 'translateY(16px)', opacity: '0' },
+        fadeSlideUp: {
+          from: { transform: 'translateY(20px)', opacity: '0' },
           to: { transform: 'translateY(0)', opacity: '1' },
+        },
+        scaleIn: {
+          from: { transform: 'scale(0.9)', opacity: '0' },
+          to: { transform: 'scale(1)', opacity: '1' },
+        },
+        warmPulse: {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(212,117,46,0.3)' },
+          '50%': { boxShadow: '0 0 0 8px rgba(212,117,46,0)' },
         },
       },
     },

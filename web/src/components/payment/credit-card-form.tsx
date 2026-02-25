@@ -39,7 +39,7 @@ function maskCpf(value: string): string {
 }
 
 const inputClass =
-  'w-full h-12 bg-surface border border-border rounded-2xl px-4 text-text placeholder:text-text-light focus:border-primary/60 outline-none text-sm transition-colors';
+  'w-full h-12 bg-surface-2 border border-border rounded-xl px-4 text-text placeholder:text-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none text-sm transition-all';
 
 export function CreditCardForm({ onSubmit, loading }: CreditCardFormProps) {
   const [cardNumber, setCardNumber] = useState('');
@@ -181,7 +181,7 @@ export function CreditCardForm({ onSubmit, loading }: CreditCardFormProps) {
       <button
         type="submit"
         disabled={loading}
-        className="w-full h-12 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-2xl font-bold transition-colors mt-1"
+        className="w-full h-12 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-xl font-bold shadow-warm hover:shadow-glow transition-all mt-1"
       >
         {loading ? 'Processando...' : 'Pagar com cartao'}
       </button>

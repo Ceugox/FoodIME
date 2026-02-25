@@ -23,17 +23,17 @@ export default function LoginPage() {
     }
   }
 
-  const inputClass = 'w-full h-12 bg-surface border border-border rounded-2xl px-4 text-text placeholder:text-text-light focus:border-primary/60 outline-none text-sm transition-colors';
+  const inputClass = 'w-full h-12 bg-surface-2 border border-border rounded-xl px-4 text-text placeholder:text-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none text-sm transition-all';
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm animate-slide-up">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="h-16 w-[118px] rounded-2xl overflow-hidden border border-border mb-4 flex items-center justify-center bg-surface">
+          <div className="h-16 w-[118px] rounded-xl overflow-hidden border border-border mb-4 flex items-center justify-center bg-surface">
             <Image src="/logo.png" alt="FoodIME" width={118} height={64} className="object-contain w-full h-full" />
           </div>
-          <h1 className="text-3xl font-extrabold text-accent tracking-wide">FoodIME</h1>
+          <h1 className="text-3xl font-serif text-accent tracking-wide">FoodIME</h1>
           <p className="text-text-secondary text-sm mt-1">Entre na sua conta</p>
         </div>
 
@@ -62,7 +62,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 bg-error/10 border border-error/30 rounded-xl px-4 py-2.5">
+            <div className="flex items-center gap-2 bg-error/10 border border-error/30 rounded-xl px-4 py-2.5 animate-scale-in">
               <svg className="w-4 h-4 text-error flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.834-1.964-.834-2.732 0L3.072 16.5C2.302 18.333 3.264 19 4.804 19z" />
               </svg>
@@ -73,7 +73,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={login.isPending}
-            className="w-full h-12 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-2xl font-bold transition-colors mt-2"
+            className="w-full h-12 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-xl font-bold shadow-warm hover:shadow-glow transition-all mt-2"
           >
             {login.isPending ? 'Entrando...' : 'Entrar'}
           </button>

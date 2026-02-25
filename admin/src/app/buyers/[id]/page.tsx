@@ -7,15 +7,39 @@ import { apiFetch } from '@/lib/api';
 
 interface BuyerData {
   user: { id: string; name: string; email: string; phone: string | null; createdAt: string };
-  stats: { totalOrders: number; totalSpent: number };
+  totalOrders: number;
+  totalSpent: number;
   orders: Array<{
     id: string;
     code: string;
-    total: number;
+    totalAmount: number;
     status: string;
-    storeName: string;
+    store: { name: string };
     createdAt: string;
   }>;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    PENDING: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    PAID: 'bg-green-100 text-green-700 border-green-200',
+    PICKED_UP: 'bg-gray-100 text-gray-600 border-gray-200',
+    CANCELLED: 'bg-red-100 text-red-700 border-red-200',
+  };
+  return (
+    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${styles[status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+      {status}
+    </span>
+  );
+}
+
+function MetricCard({ value, label }: { value: string | number; label: string }) {
+  return (
+    <div className="bg-card rounded-xl border border-border p-4">
+      <p className="text-2xl font-serif text-foreground">{value}</p>
+      <p className="text-muted-foreground text-xs mt-1">{label}</p>
+    </div>
+  );
 }
 
 export default function BuyerDetailPage() {
@@ -31,76 +55,61 @@ export default function BuyerDetailPage() {
       .finally(() => setLoading(false));
   }, [params.id]);
 
-  if (loading) return <AdminLayout><p style={{ padding: 40, color: '#64748b' }}>Carregando...</p></AdminLayout>;
-  if (!data) return <AdminLayout><p style={{ padding: 40, color: '#ef4444' }}>Comprador nao encontrado</p></AdminLayout>;
+  if (loading) return <AdminLayout><p className="p-10 text-muted-foreground">Carregando...</p></AdminLayout>;
+  if (!data) return <AdminLayout><p className="p-10 text-destructive">Comprador não encontrado</p></AdminLayout>;
 
-  const { user, stats, orders } = data;
-
-  function statusBadge(status: string) {
-    const map: Record<string, string> = {
-      PENDING: 'badge badge-warning',
-      PAID: 'badge badge-success',
-      PICKED_UP: 'badge badge-secondary',
-      CANCELLED: 'badge badge-error',
-    };
-    return <span className={map[status] || 'badge badge-secondary'}>{status}</span>;
-  }
+  const { user, totalOrders, totalSpent, orders } = data;
 
   return (
     <AdminLayout>
-      <button onClick={() => router.back()} className="btn-outline" style={{ marginBottom: 16 }}>
-        ← Voltar
+      <button
+        onClick={() => router.back()}
+        className="mb-4 px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+      >
+        &larr; Voltar
       </button>
 
-      <div className="card" style={{ marginBottom: 24 }}>
-        <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>{user.name}</h3>
-        <p style={{ fontSize: 14, color: '#64748b' }}>{user.email}</p>
-        <p style={{ fontSize: 14, color: '#64748b' }}>{user.phone || 'Sem telefone'}</p>
-        <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
+      <div className="bg-card rounded-xl border border-border p-6 mb-6">
+        <h3 className="text-lg font-serif text-foreground mb-3">{user.name}</h3>
+        <p className="text-sm text-muted-foreground">{user.email}</p>
+        <p className="text-sm text-muted-foreground">{user.phone || 'Sem telefone'}</p>
+        <p className="text-xs text-muted-foreground/70 mt-2">
           Cadastro: {new Date(user.createdAt).toLocaleDateString('pt-BR')}
         </p>
       </div>
 
-      <div className="grid-3" style={{ marginBottom: 32 }}>
-        <div className="metric-card">
-          <div className="value">{stats.totalOrders}</div>
-          <div className="label">Pedidos</div>
-        </div>
-        <div className="metric-card">
-          <div className="value">R$ {(stats.totalSpent / 100).toFixed(2)}</div>
-          <div className="label">Total Gasto</div>
-        </div>
-        <div className="metric-card">
-          <div className="value">
-            R$ {stats.totalOrders > 0 ? ((stats.totalSpent / stats.totalOrders) / 100).toFixed(2) : '0.00'}
-          </div>
-          <div className="label">Ticket Medio</div>
-        </div>
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        <MetricCard value={totalOrders} label="Pedidos" />
+        <MetricCard value={`R$ ${(totalSpent / 100).toFixed(2)}`} label="Total Gasto" />
+        <MetricCard
+          value={`R$ ${totalOrders > 0 ? ((totalSpent / totalOrders) / 100).toFixed(2) : '0.00'}`}
+          label="Ticket Médio"
+        />
       </div>
 
-      <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Historico de Pedidos</h3>
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <h3 className="text-base font-serif text-foreground mb-4">Histórico de Pedidos</h3>
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         {orders.length === 0 ? (
-          <p style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Nenhum pedido</p>
+          <p className="p-10 text-center text-muted-foreground">Nenhum pedido</p>
         ) : (
-          <table>
+          <table className="w-full">
             <thead>
-              <tr>
-                <th>Codigo</th>
-                <th>Loja</th>
-                <th>Total</th>
-                <th>Status</th>
-                <th>Data</th>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Código</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Loja</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Data</th>
               </tr>
             </thead>
             <tbody>
               {orders.map((order) => (
-                <tr key={order.id}>
-                  <td style={{ fontWeight: 600, fontFamily: 'monospace' }}>{order.code}</td>
-                  <td>{order.storeName}</td>
-                  <td>R$ {(order.total / 100).toFixed(2)}</td>
-                  <td>{statusBadge(order.status)}</td>
-                  <td>{new Date(order.createdAt).toLocaleDateString('pt-BR')}</td>
+                <tr key={order.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3 text-sm font-semibold font-mono text-foreground">{order.code}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{order.store?.name || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-foreground">R$ {(Number(order.totalAmount) / 100).toFixed(2)}</td>
+                  <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(order.createdAt).toLocaleDateString('pt-BR')}</td>
                 </tr>
               ))}
             </tbody>

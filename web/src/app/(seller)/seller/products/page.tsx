@@ -24,13 +24,13 @@ function ProductCard({ product }: { product: Product }) {
 
   return (
     <>
-      <div className="bg-surface rounded-2xl border border-border p-3 flex items-center gap-3 mb-2">
+      <div className="bg-surface rounded-xl border border-border p-3 flex items-center gap-3 mb-2 hover:border-border-hover transition-all">
         {/* Image */}
         <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-surface-2 flex-shrink-0">
           {product.imageUrl ? (
             <Image src={product.imageUrl} alt={product.name} fill className="object-cover" />
           ) : (
-            <div className="h-full flex items-center justify-center text-text-light text-lg font-bold">
+            <div className="h-full flex items-center justify-center text-text-muted text-lg font-serif">
               {product.name.charAt(0).toUpperCase()}
             </div>
           )}
@@ -39,7 +39,7 @@ function ProductCard({ product }: { product: Product }) {
         {/* Info */}
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-text text-sm truncate">{product.name}</p>
-          <p className="text-primary font-bold text-sm">{formatCurrency(product.price)}</p>
+          <p className="text-primary font-serif text-sm">{formatCurrency(product.price)}</p>
           <StockBadge stockQty={product.stockQty} isAvailable={product.isAvailable} />
         </div>
 
@@ -75,14 +75,14 @@ function ProductCard({ product }: { product: Product }) {
 
       {/* Confirm remove dialog */}
       {removing && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-4 pb-8">
-          <div className="w-full max-w-sm bg-surface rounded-2xl p-6 border border-border animate-slide-up">
-            <h3 className="text-text font-bold text-lg mb-1">Remover produto</h3>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm px-4 pb-8">
+          <div className="w-full max-w-sm bg-surface rounded-xl p-6 border border-border animate-slide-up shadow-warm-lg">
+            <h3 className="text-text font-serif text-lg mb-1">Remover produto</h3>
             <p className="text-text-secondary text-sm mb-5">
-              Deseja remover <span className="text-accent font-semibold">"{product.name}"</span>?
+              Deseja remover <span className="text-primary font-semibold">"{product.name}"</span>?
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setRemoving(false)} className="flex-1 h-11 rounded-xl border border-border text-text-secondary text-sm font-semibold">
+              <button onClick={() => setRemoving(false)} className="flex-1 h-11 rounded-xl border border-border text-text-secondary text-sm font-semibold hover:border-border-hover transition-colors">
                 Cancelar
               </button>
               <button
@@ -124,13 +124,13 @@ function CreateModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  const inputClass = 'w-full h-11 bg-background border border-border rounded-xl px-4 text-text text-sm placeholder:text-text-light focus:border-primary/60 outline-none';
+  const inputClass = 'w-full h-11 bg-surface-2 border border-border rounded-xl px-4 text-text text-sm placeholder:text-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none transition-all';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-0">
-      <div className="w-full max-w-lg bg-surface rounded-t-3xl p-6 pb-10 border-t border-border animate-slide-up">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm px-0">
+      <div className="w-full max-w-lg bg-surface rounded-t-2xl p-6 pb-10 border-t border-border animate-slide-up shadow-warm-lg">
         <div className="w-10 h-1 bg-border rounded-full mx-auto mb-6" />
-        <h3 className="text-text font-bold text-xl mb-5 text-center">Novo produto</h3>
+        <h3 className="text-text font-serif text-xl mb-5 text-center">Novo produto</h3>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
@@ -153,10 +153,10 @@ function CreateModal({ onClose }: { onClose: () => void }) {
           {error && <p className="text-error text-xs bg-error/10 border border-error/30 rounded-xl px-3 py-2">{error}</p>}
 
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 h-12 rounded-2xl border border-border text-text-secondary font-semibold">
+            <button type="button" onClick={onClose} className="flex-1 h-12 rounded-xl border border-border text-text-secondary font-semibold hover:border-border-hover transition-colors">
               Cancelar
             </button>
-            <button type="submit" disabled={create.isPending} className="flex-1 h-12 rounded-2xl bg-primary text-white font-bold disabled:opacity-60">
+            <button type="submit" disabled={create.isPending} className="flex-1 h-12 rounded-xl bg-primary text-white font-bold disabled:opacity-60 shadow-warm hover:shadow-glow transition-all">
               {create.isPending ? 'Criando...' : 'Criar'}
             </button>
           </div>
@@ -172,12 +172,12 @@ export default function SellerProductsPage() {
   const { data: products, isLoading, isError, refetch } = useProducts(store?.id ?? '');
 
   return (
-    <div className="px-5 pt-4">
+    <div className="px-5 pt-4 animate-slide-up">
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-bold text-text">Produtos</h1>
+        <h1 className="text-2xl font-serif text-text">Produtos</h1>
         <button
           onClick={() => setShowModal(true)}
-          className="w-10 h-10 rounded-full bg-primary flex items-center justify-center hover:bg-primary-light transition-colors"
+          className="w-10 h-10 rounded-full bg-primary flex items-center justify-center hover:bg-primary-light shadow-glow animate-warm-pulse transition-all"
         >
           <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -187,22 +187,22 @@ export default function SellerProductsPage() {
 
       {storeLoading || isLoading ? (
         Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-[72px] bg-surface rounded-2xl border border-border mb-2 animate-shimmer" />
+          <div key={i} className="h-[72px] bg-surface rounded-xl border border-border mb-2 animate-shimmer" />
         ))
       ) : !store ? (
         <div className="text-center py-16">
           <p className="text-text-secondary font-semibold">Configure sua loja primeiro</p>
-          <p className="text-text-light text-sm mt-1">Acesse a aba "Loja" para criar sua loja</p>
+          <p className="text-text-muted text-sm mt-1">Acesse a aba "Loja" para criar sua loja</p>
         </div>
       ) : isError ? (
         <ErrorState onRetry={refetch} />
       ) : !products?.length ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <svg className="w-12 h-12 text-text-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex flex-col items-center justify-center py-20 gap-3 animate-scale-in">
+          <svg className="w-12 h-12 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z" />
           </svg>
           <p className="text-text-secondary font-semibold">Nenhum produto cadastrado</p>
-          <button onClick={() => setShowModal(true)} className="text-accent text-sm font-semibold underline">
+          <button onClick={() => setShowModal(true)} className="text-primary text-sm font-semibold underline">
             Adicionar primeiro produto
           </button>
         </div>

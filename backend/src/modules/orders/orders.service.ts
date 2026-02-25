@@ -1,12 +1,43 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import type { UserPayload } from '../../common/decorators/current-user.decorator';
 
+const PENDING_EXPIRY_MS = 20 * 60 * 1000; // 20 minutos
+
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Deleta permanentemente pedidos PENDING com mais de 20 minutos.
+   * Deleta primeiro os OrderItems (FK) e depois os Orders.
+   */
+  async cleanupExpiredOrders(): Promise<number> {
+    const cutoff = new Date(Date.now() - PENDING_EXPIRY_MS);
+
+    const expired = await this.prisma.order.findMany({
+      where: { status: 'PENDING', createdAt: { lt: cutoff } },
+      select: { id: true },
+    });
+
+    if (expired.length === 0) return 0;
+
+    const ids = expired.map((o) => o.id);
+
+    // Deletar em ordem: payments -> orderItems -> orders
+    await this.prisma.$transaction([
+      this.prisma.payment.deleteMany({ where: { orderId: { in: ids } } }),
+      this.prisma.orderItem.deleteMany({ where: { orderId: { in: ids } } }),
+      this.prisma.order.deleteMany({ where: { id: { in: ids } } }),
+    ]);
+
+    this.logger.log(`Deleted ${ids.length} expired PENDING orders`);
+    return ids.length;
+  }
 
   async create(dto: CreateOrderDto, user: UserPayload) {
     const products = await this.prisma.product.findMany({
@@ -69,8 +100,13 @@ export class OrdersService {
   }
 
   async findByBuyer(user: UserPayload) {
+    // Limpar pedidos expirados antes de listar
+    await this.cleanupExpiredOrders();
+
     const orders = await this.prisma.order.findMany({
-      where: { buyerId: user.id },
+      where: {
+        buyerId: user.id,
+      },
       include: {
         items: {
           include: { product: { select: { name: true, imageUrl: true } } },
@@ -94,7 +130,10 @@ export class OrdersService {
     }
 
     const orders = await this.prisma.order.findMany({
-      where: { storeId: store.id },
+      where: {
+        storeId: store.id,
+        status: { in: ['PAID', 'PICKED_UP'] },
+      },
       include: {
         items: {
           include: { product: { select: { name: true } } },

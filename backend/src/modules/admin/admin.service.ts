@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+
+const PENDING_EXPIRY_MS = 20 * 60 * 1000;
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -212,6 +214,21 @@ export class AdminService {
   }
 
   async getDashboardOverview() {
+    // Limpar pedidos PENDING expirados (>20min) antes de contar
+    const cutoff = new Date(Date.now() - 20 * 60 * 1000);
+    const expired = await this.prisma.order.findMany({
+      where: { status: 'PENDING', createdAt: { lt: cutoff } },
+      select: { id: true },
+    });
+    if (expired.length > 0) {
+      const ids = expired.map((o) => o.id);
+      await this.prisma.$transaction([
+        this.prisma.payment.deleteMany({ where: { orderId: { in: ids } } }),
+        this.prisma.orderItem.deleteMany({ where: { orderId: { in: ids } } }),
+        this.prisma.order.deleteMany({ where: { id: { in: ids } } }),
+      ]);
+    }
+
     const [userCounts, orderCounts, paymentTotals] = await Promise.all([
       this.prisma.user.groupBy({
         by: ['role'],

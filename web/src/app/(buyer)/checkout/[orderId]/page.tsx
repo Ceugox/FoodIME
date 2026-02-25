@@ -44,7 +44,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
 
   const { data: order, isLoading } = useOrder(orderId);
   const initiate = useInitiatePayment();
-  const [pollPayment, setPollPayment] = useState(true);
+  const [pollPayment, setPollPayment] = useState(false);
   const { data: payment } = usePaymentByOrder(orderId, pollPayment);
 
   // Redirect when paid
@@ -64,6 +64,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
     try {
       const result = await initiate.mutateAsync({ orderId, method: 'PIX' });
       setPixData({ qrCode: result.pixQrCode!, base64: result.pixQrCodeBase64, startedAt: Date.now() });
+      setPollPayment(true);
     } catch (err: any) {
       alert(err?.response?.data?.message || 'Erro ao gerar PIX');
     }
@@ -96,27 +97,27 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="px-5 pt-4">
+    <div className="px-5 pt-4 animate-slide-up">
       <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => router.back()} className="w-9 h-9 flex items-center justify-center rounded-xl bg-surface border border-border">
+        <button onClick={() => router.back()} className="w-9 h-9 flex items-center justify-center rounded-xl bg-surface border border-border hover:border-border-hover transition-colors">
           <svg className="w-4 h-4 text-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
         </button>
-        <h1 className="text-lg font-bold text-text">Pagamento</h1>
+        <h1 className="text-lg font-serif text-text">Pagamento</h1>
       </div>
 
       {/* Order summary */}
-      <div className="bg-surface rounded-2xl border border-border p-4 mb-4">
+      <div className="bg-surface rounded-xl border border-border p-4 mb-4">
         <p className="text-text-secondary text-xs mb-1">Total do pedido</p>
-        <p className="text-accent text-2xl font-extrabold">{formatCurrency(order?.totalAmount || 0)}</p>
-        <p className="text-text-secondary text-xs mt-1">Pedido #{order?.code}</p>
+        <p className="text-accent text-2xl font-serif">{formatCurrency(order?.totalAmount || 0)}</p>
+        <p className="text-text-muted text-xs mt-1">Pedido #{order?.code}</p>
       </div>
 
       {/* Tabs */}
@@ -125,8 +126,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-              tab === t ? 'bg-primary text-white' : 'bg-surface border border-border text-text-secondary'
+            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              tab === t ? 'bg-primary text-white shadow-glow' : 'bg-surface border border-border text-text-secondary hover:border-border-hover'
             }`}
           >
             {t === 'PIX' ? 'PIX' : 'Cartão'}
@@ -140,32 +141,32 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
             <button
               onClick={handlePix}
               disabled={initiate.isPending}
-              className="w-full h-12 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-2xl font-bold transition-colors"
+              className="w-full h-12 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-xl font-bold shadow-warm hover:shadow-glow transition-all"
             >
               {initiate.isPending ? 'Gerando PIX...' : 'Gerar QR Code PIX'}
             </button>
           ) : (
-            <div className="space-y-4">
-              <div className="bg-white p-4 rounded-2xl flex items-center justify-center">
+            <div className="space-y-4 animate-scale-in">
+              <div className="bg-white p-4 rounded-xl flex items-center justify-center shadow-warm">
                 <QRCodeSVG value={pixData.qrCode} size={220} />
               </div>
               <CountdownTimer startedAt={pixData.startedAt} />
-              <div className="bg-surface rounded-xl border border-border p-3 break-all text-xs text-text-secondary font-mono leading-relaxed">
+              <div className="bg-surface-2 rounded-xl border border-border p-3 break-all text-xs text-text-secondary font-mono leading-relaxed">
                 {pixData.qrCode}
               </div>
               <button
                 onClick={handleCopy}
-                className="w-full h-11 border border-primary text-primary rounded-xl font-semibold text-sm hover:bg-primary/10 transition-colors"
+                className="w-full h-11 border border-primary text-primary rounded-xl font-semibold text-sm hover:bg-primary/10 transition-all"
               >
-                {copied ? '✓ Copiado!' : 'Copiar código PIX'}
+                {copied ? 'Copiado!' : 'Copiar código PIX'}
               </button>
               <p className="text-center text-xs text-text-secondary">
                 Aguardando confirmação do pagamento...
               </p>
               <div className="flex items-center justify-center gap-2">
-                <div className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '200ms' }} />
-                <div className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '400ms' }} />
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '200ms' }} />
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '400ms' }} />
               </div>
             </div>
           )}
@@ -173,7 +174,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
       ) : (
         <div>
           {cardError && (
-            <div className="flex items-center gap-2 bg-error/10 border border-error/30 rounded-xl px-4 py-2.5 mb-3">
+            <div className="flex items-center gap-2 bg-error/10 border border-error/30 rounded-xl px-4 py-2.5 mb-3 animate-scale-in">
               <svg className="w-4 h-4 text-error flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.834-1.964-.834-2.732 0L3.072 16.5C2.302 18.333 3.264 19 4.804 19z" />
               </svg>

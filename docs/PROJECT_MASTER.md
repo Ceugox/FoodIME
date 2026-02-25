@@ -489,15 +489,15 @@ ADMIN_PASSWORD_HASH=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
+### [2026-02-24] Redesign visual completo — paleta warm + tipografia artesanal
+- **Problema:** Frontend web (buyer, seller) e admin usavam paleta olive/lime fria com tipografia genérica (Inter). Visual "AI slop" sem personalidade.
+- **Solução:** Redesign completo de 32 arquivos em 6 fases. Nova paleta dark warm (burnt orange #D4752E, gold #F0C05A, brown backgrounds). Tipografia DM Serif Display (headings) + DM Sans (body). Animações: fadeSlideUp com stagger cascata, scaleIn, warmPulse. Sombras quentes (shadow-warm, shadow-glow). BottomNav com frosted glass + dot indicator. Admin migrado de inline styles para Tailwind com paleta light warm (#FAF6F1). Rename global text-text-light → text-text-muted.
+- **Arquivos alterados:** `web/tailwind.config.ts`, `web/src/app/globals.css`, `web/src/app/layout.tsx`, `admin/tailwind.config.ts`, `admin/src/app/globals.css`, `admin/src/app/layout.tsx`, 6 componentes web (BottomNav, Skeleton, ErrorState, StockBadge, LoadingSkeleton, credit-card-form), 2 auth (login, register), 6 buyer (home, store, cart, checkout, orders, profile), 4 seller (dashboard, orders, products, store), 8 admin (Sidebar, AdminLayout, login, dashboard, users, transactions, sellers/[id], buyers/[id]), `web/src/app/offline/page.tsx`
+
 ### [2026-02-23] Web PWA criado — buyer e seller
 - **Problema:** App só existia como mobile (React Native + Expo). Precisava de versão web responsiva + PWA instalável para buyers e sellers.
 - **Solução:** Criado `web/` com Next.js 15 App Router, Tailwind (paleta dark olive idêntica ao mobile), next-pwa com service worker, middleware de rotas por JWT cookie, TanStack Query + Zustand (localStorage), Socket.io para orders em tempo real do seller. Todas as páginas: login, register, home, store/[id], cart, checkout PIX, orders, profile (buyer) e dashboard, orders, products, store (seller).
 - **Arquivos criados:** `web/` (diretório completo — package.json, next.config.ts, tailwind.config.ts, src/app/**, src/components/**, src/hooks/**, src/services/**, src/store/**, src/types/**, src/middleware.ts)
-
-### [2026-02-22] Aprovação imediata de cartão de crédito + erros explícitos
-- **Problema:** Pagamento com cartão ficava em `PROCESSING`. Qualquer rejeição mostrava mensagem genérica. Criar produto sem loja disparava erro interno P2025.
-- **Solução:** `payments.service.ts` verifica `result.status` imediatamente. Mapeamento de `status_detail` para português. `PrismaExceptionFilter` global (P2025→404, P2002→409). Produto sem loja mostra mensagem explícita.
-- **Arquivos alterados:** `backend/src/modules/payments/payments.service.ts`, `backend/src/modules/products/products.service.ts`, `backend/src/common/filters/prisma-exception.filter.ts`, `backend/src/main.ts`
 
 ---
 

@@ -6,21 +6,46 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { apiFetch } from '@/lib/api';
 
 interface SellerData {
-  user: { id: string; name: string; email: string; phone: string | null; createdAt: string };
+  user: { id: string; name: string; email: string; phone: string | null; createdAt?: string };
   store: { id: string; name: string; isOpen: boolean; whatsapp: string; pixKey: string; commissionRate: number; createdAt: string } | null;
   metrics: {
     totalOrders: number;
-    totalRevenue: number;
+    totalGross: number;
     totalCommission: number;
     totalNet: number;
-  };
+    monthRevenue: number;
+    monthOrders: number;
+  } | null;
   recentOrders: Array<{
     id: string;
     code: string;
-    total: number;
+    totalAmount: number;
     status: string;
     createdAt: string;
   }>;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    PENDING: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    PAID: 'bg-green-100 text-green-700 border-green-200',
+    PICKED_UP: 'bg-gray-100 text-gray-600 border-gray-200',
+    CANCELLED: 'bg-red-100 text-red-700 border-red-200',
+  };
+  return (
+    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${styles[status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+      {status}
+    </span>
+  );
+}
+
+function MetricCard({ value, label, color }: { value: string | number; label: string; color?: string }) {
+  return (
+    <div className="bg-card rounded-xl border border-border p-4">
+      <p className={`text-2xl font-serif ${color || 'text-foreground'}`}>{value}</p>
+      <p className="text-muted-foreground text-xs mt-1">{label}</p>
+    </div>
+  );
 }
 
 export default function SellerDetailPage() {
@@ -65,52 +90,51 @@ export default function SellerDetailPage() {
     }
   }
 
-  if (loading) return <AdminLayout><p style={{ padding: 40, color: '#64748b' }}>Carregando...</p></AdminLayout>;
-  if (!data) return <AdminLayout><p style={{ padding: 40, color: '#ef4444' }}>Vendedor nao encontrado</p></AdminLayout>;
+  if (loading) return <AdminLayout><p className="p-10 text-muted-foreground">Carregando...</p></AdminLayout>;
+  if (!data) return <AdminLayout><p className="p-10 text-destructive">Vendedor não encontrado</p></AdminLayout>;
 
   const { user, store, metrics, recentOrders } = data;
 
-  function statusBadge(status: string) {
-    const map: Record<string, string> = {
-      PENDING: 'badge badge-warning',
-      PAID: 'badge badge-success',
-      PICKED_UP: 'badge badge-secondary',
-      CANCELLED: 'badge badge-error',
-    };
-    return <span className={map[status] || 'badge badge-secondary'}>{status}</span>;
-  }
-
   return (
     <AdminLayout>
-      <button onClick={() => router.back()} className="btn-outline" style={{ marginBottom: 16 }}>
-        ← Voltar
+      <button
+        onClick={() => router.back()}
+        className="mb-4 px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+      >
+        &larr; Voltar
       </button>
 
-      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', marginBottom: 32 }}>
-        <div className="card" style={{ flex: 1 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>{user.name}</h3>
-          <p style={{ fontSize: 14, color: '#64748b' }}>{user.email}</p>
-          <p style={{ fontSize: 14, color: '#64748b' }}>{user.phone || 'Sem telefone'}</p>
-          <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
-            Cadastro: {new Date(user.createdAt).toLocaleDateString('pt-BR')}
-          </p>
+      <div className="flex gap-6 items-start mb-8">
+        <div className="flex-1 bg-card rounded-xl border border-border p-6">
+          <h3 className="text-lg font-serif text-foreground mb-3">{user.name}</h3>
+          <p className="text-sm text-muted-foreground">{user.email}</p>
+          <p className="text-sm text-muted-foreground">{user.phone || 'Sem telefone'}</p>
+          {user.createdAt && (
+            <p className="text-xs text-muted-foreground/70 mt-2">
+              Cadastro: {new Date(user.createdAt).toLocaleDateString('pt-BR')}
+            </p>
+          )}
         </div>
 
         {store && (
-          <div className="card" style={{ flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700 }}>{store.name}</h3>
-              <span className={store.isOpen ? 'badge badge-success' : 'badge badge-secondary'}>
+          <div className="flex-1 bg-card rounded-xl border border-border p-6">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-serif text-foreground">{store.name}</h3>
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                store.isOpen
+                  ? 'bg-green-100 text-green-700 border-green-200'
+                  : 'bg-gray-100 text-gray-600 border-gray-200'
+              }`}>
                 {store.isOpen ? 'Aberta' : 'Fechada'}
               </span>
             </div>
-            <p style={{ fontSize: 14, color: '#64748b' }}>WhatsApp: {store.whatsapp}</p>
-            <p style={{ fontSize: 14, color: '#64748b' }}>Pix: {store.pixKey}</p>
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', display: 'block', marginBottom: 8 }}>
-                Taxa de Comissao (%)
+            <p className="text-sm text-muted-foreground">WhatsApp: {store.whatsapp}</p>
+            <p className="text-sm text-muted-foreground">Pix: {store.pixKey}</p>
+            <div className="mt-4 pt-4 border-t border-border">
+              <label className="block text-sm font-semibold text-foreground mb-2">
+                Taxa de Comissão (%)
               </label>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div className="flex gap-2 items-center">
                 <input
                   type="number"
                   min="0"
@@ -118,19 +142,18 @@ export default function SellerDetailPage() {
                   step="0.5"
                   value={commissionInput}
                   onChange={(e) => setCommissionInput(e.target.value)}
-                  style={{ width: 80 }}
+                  className="w-20 h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:border-primary outline-none"
                 />
-                <span style={{ fontSize: 14, color: '#64748b' }}>%</span>
+                <span className="text-sm text-muted-foreground">%</span>
                 <button
-                  className="btn-primary"
                   onClick={saveCommission}
                   disabled={savingCommission}
-                  style={{ fontSize: 13, padding: '6px 16px' }}
+                  className="px-4 py-1.5 bg-primary hover:bg-primary-light text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
                 >
                   {savingCommission ? 'Salvando...' : 'Salvar'}
                 </button>
                 {commissionMsg && (
-                  <span style={{ fontSize: 13, color: commissionMsg === 'Salvo!' ? '#22c55e' : '#ef4444' }}>
+                  <span className={`text-sm ${commissionMsg === 'Salvo!' ? 'text-green-500' : 'text-destructive'}`}>
                     {commissionMsg}
                   </span>
                 )}
@@ -140,46 +163,36 @@ export default function SellerDetailPage() {
         )}
       </div>
 
-      <div className="grid-4" style={{ marginBottom: 32 }}>
-        <div className="metric-card">
-          <div className="value">{metrics.totalOrders}</div>
-          <div className="label">Pedidos</div>
+      {metrics && (
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <MetricCard value={metrics.totalOrders} label="Pedidos" />
+          <MetricCard value={`R$ ${(metrics.totalGross / 100).toFixed(2)}`} label="Receita Bruta" />
+          <MetricCard value={`R$ ${(metrics.totalCommission / 100).toFixed(2)}`} label="Comissão" color="text-primary" />
+          <MetricCard value={`R$ ${(metrics.totalNet / 100).toFixed(2)}`} label="Líquido" color="text-green-500" />
         </div>
-        <div className="metric-card">
-          <div className="value">R$ {(metrics.totalRevenue / 100).toFixed(2)}</div>
-          <div className="label">Receita Bruta</div>
-        </div>
-        <div className="metric-card">
-          <div className="value" style={{ color: '#f97316' }}>R$ {(metrics.totalCommission / 100).toFixed(2)}</div>
-          <div className="label">Comissao</div>
-        </div>
-        <div className="metric-card">
-          <div className="value" style={{ color: '#22c55e' }}>R$ {(metrics.totalNet / 100).toFixed(2)}</div>
-          <div className="label">Liquido</div>
-        </div>
-      </div>
+      )}
 
-      <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Pedidos Recentes</h3>
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <h3 className="text-base font-serif text-foreground mb-4">Pedidos Recentes</h3>
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         {recentOrders.length === 0 ? (
-          <p style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Nenhum pedido</p>
+          <p className="p-10 text-center text-muted-foreground">Nenhum pedido</p>
         ) : (
-          <table>
+          <table className="w-full">
             <thead>
-              <tr>
-                <th>Codigo</th>
-                <th>Total</th>
-                <th>Status</th>
-                <th>Data</th>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Código</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Data</th>
               </tr>
             </thead>
             <tbody>
               {recentOrders.map((order) => (
-                <tr key={order.id}>
-                  <td style={{ fontWeight: 600, fontFamily: 'monospace' }}>{order.code}</td>
-                  <td>R$ {(order.total / 100).toFixed(2)}</td>
-                  <td>{statusBadge(order.status)}</td>
-                  <td>{new Date(order.createdAt).toLocaleDateString('pt-BR')}</td>
+                <tr key={order.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3 text-sm font-semibold font-mono text-foreground">{order.code}</td>
+                  <td className="px-4 py-3 text-sm text-foreground">R$ {(Number(order.totalAmount) / 100).toFixed(2)}</td>
+                  <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(order.createdAt).toLocaleDateString('pt-BR')}</td>
                 </tr>
               ))}
             </tbody>

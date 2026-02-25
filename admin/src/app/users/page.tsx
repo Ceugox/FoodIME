@@ -14,6 +14,24 @@ interface User {
   createdAt: string;
 }
 
+function RoleBadge({ role }: { role: string }) {
+  const styles: Record<string, string> = {
+    ADMIN: 'bg-red-100 text-red-700 border-red-200',
+    SELLER: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    BUYER: 'bg-green-100 text-green-700 border-green-200',
+  };
+  const labels: Record<string, string> = {
+    ADMIN: 'Admin',
+    SELLER: 'Vendedor',
+    BUYER: 'Comprador',
+  };
+  return (
+    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${styles[role] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+      {labels[role] || role}
+    </span>
+  );
+}
+
 export default function UsersPage() {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
@@ -47,32 +65,22 @@ export default function UsersPage() {
     }
   }
 
-  function roleBadge(role: string) {
-    const map: Record<string, string> = {
-      ADMIN: 'badge badge-error',
-      SELLER: 'badge badge-warning',
-      BUYER: 'badge badge-success',
-    };
-    const labels: Record<string, string> = {
-      ADMIN: 'Admin',
-      SELLER: 'Vendedor',
-      BUYER: 'Comprador',
-    };
-    return <span className={map[role] || 'badge badge-secondary'}>{labels[role] || role}</span>;
-  }
-
   return (
     <AdminLayout>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700 }}>Usuarios</h2>
-        <div style={{ display: 'flex', gap: 12 }}>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-serif text-foreground">Usuários</h2>
+        <div className="flex gap-3">
           <input
             placeholder="Buscar por nome ou email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 260 }}
+            className="w-[260px] h-10 rounded-lg border border-input bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none transition-all"
           />
-          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:border-primary outline-none"
+          >
             <option value="">Todos os perfis</option>
             <option value="BUYER">Compradores</option>
             <option value="SELLER">Vendedores</option>
@@ -81,20 +89,20 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         {loading ? (
-          <p style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Carregando...</p>
+          <p className="p-10 text-center text-muted-foreground">Carregando...</p>
         ) : users.length === 0 ? (
-          <p style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Nenhum usuario encontrado</p>
+          <p className="p-10 text-center text-muted-foreground">Nenhum usuário encontrado</p>
         ) : (
-          <table>
+          <table className="w-full">
             <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Email</th>
-                <th>Perfil</th>
-                <th>Telefone</th>
-                <th>Cadastro</th>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nome</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Perfil</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Telefone</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cadastro</th>
               </tr>
             </thead>
             <tbody>
@@ -102,13 +110,13 @@ export default function UsersPage() {
                 <tr
                   key={user.id}
                   onClick={() => handleRowClick(user)}
-                  style={{ cursor: user.role !== 'ADMIN' ? 'pointer' : 'default' }}
+                  className={`border-b border-border last:border-0 hover:bg-muted/30 transition-colors ${user.role !== 'ADMIN' ? 'cursor-pointer' : ''}`}
                 >
-                  <td style={{ fontWeight: 500 }}>{user.name}</td>
-                  <td>{user.email}</td>
-                  <td>{roleBadge(user.role)}</td>
-                  <td>{user.phone || '—'}</td>
-                  <td>{new Date(user.createdAt).toLocaleDateString('pt-BR')}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-foreground">{user.name}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{user.email}</td>
+                  <td className="px-4 py-3"><RoleBadge role={user.role} /></td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{user.phone || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(user.createdAt).toLocaleDateString('pt-BR')}</td>
                 </tr>
               ))}
             </tbody>

@@ -6,7 +6,7 @@ interface StockBadgeProps {
 }
 
 export function StockBadge({ stockQty, isAvailable }: StockBadgeProps) {
-  if (!isAvailable || stockQty === 0) {
+  if (isAvailable === false || stockQty === 0) {
     return (
       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-error/30 bg-error/10 text-error">
         Esgotado

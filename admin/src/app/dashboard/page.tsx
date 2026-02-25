@@ -5,9 +5,18 @@ import { AdminLayout } from '@/components/AdminLayout';
 import { apiFetch } from '@/lib/api';
 
 interface DashboardData {
-  users: { total: number; buyers: number; sellers: number; admins: number };
-  orders: { total: number; pending: number; paid: number; picked_up: number; cancelled: number };
-  payments: { totalGross: number; totalCommission: number; totalNet: number };
+  users: Record<string, number>;
+  orders: Record<string, number>;
+  payments: { count: number; gross: number; commission: number; net: number };
+}
+
+function MetricCard({ value, label, color }: { value: string | number; label: string; color?: string }) {
+  return (
+    <div className="bg-card rounded-xl border border-border p-4">
+      <p className={`text-2xl font-serif ${color || 'text-foreground'}`}>{value}</p>
+      <p className="text-muted-foreground text-xs mt-1">{label}</p>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -21,73 +30,40 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <AdminLayout><p style={{ padding: 40, color: '#64748b' }}>Carregando...</p></AdminLayout>;
-  if (!data) return <AdminLayout><p style={{ padding: 40, color: '#ef4444' }}>Erro ao carregar dados</p></AdminLayout>;
+  if (loading) return <AdminLayout><p className="p-10 text-muted-foreground">Carregando...</p></AdminLayout>;
+  if (!data) return <AdminLayout><p className="p-10 text-destructive">Erro ao carregar dados</p></AdminLayout>;
 
   return (
     <AdminLayout>
-      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>Dashboard</h2>
+      <h2 className="text-2xl font-serif text-foreground mb-6">Dashboard</h2>
 
-      <h3 style={{ fontSize: 14, fontWeight: 600, color: '#64748b', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-        Usuarios
+      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+        Usuários
       </h3>
-      <div className="grid-4" style={{ marginBottom: 32 }}>
-        <div className="metric-card">
-          <div className="value">{data.users.total}</div>
-          <div className="label">Total</div>
-        </div>
-        <div className="metric-card">
-          <div className="value">{data.users.buyers}</div>
-          <div className="label">Compradores</div>
-        </div>
-        <div className="metric-card">
-          <div className="value">{data.users.sellers}</div>
-          <div className="label">Vendedores</div>
-        </div>
-        <div className="metric-card">
-          <div className="value">{data.users.admins}</div>
-          <div className="label">Admins</div>
-        </div>
+      <div className="grid grid-cols-4 gap-4 mb-8">
+        <MetricCard value={Object.values(data.users).reduce((a, b) => a + b, 0)} label="Total" />
+        <MetricCard value={data.users.BUYER || 0} label="Compradores" />
+        <MetricCard value={data.users.SELLER || 0} label="Vendedores" />
+        <MetricCard value={data.users.ADMIN || 0} label="Admins" />
       </div>
 
-      <h3 style={{ fontSize: 14, fontWeight: 600, color: '#64748b', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
         Pedidos
       </h3>
-      <div className="grid-4" style={{ marginBottom: 32 }}>
-        <div className="metric-card">
-          <div className="value">{data.orders.total}</div>
-          <div className="label">Total</div>
-        </div>
-        <div className="metric-card">
-          <div className="value" style={{ color: '#eab308' }}>{data.orders.pending}</div>
-          <div className="label">Pendentes</div>
-        </div>
-        <div className="metric-card">
-          <div className="value" style={{ color: '#22c55e' }}>{data.orders.paid}</div>
-          <div className="label">Pagos</div>
-        </div>
-        <div className="metric-card">
-          <div className="value" style={{ color: '#ef4444' }}>{data.orders.cancelled}</div>
-          <div className="label">Cancelados</div>
-        </div>
+      <div className="grid grid-cols-4 gap-4 mb-8">
+        <MetricCard value={Object.values(data.orders).reduce((a, b) => a + b, 0)} label="Total" />
+        <MetricCard value={data.orders.PENDING || 0} label="Pendentes" color="text-yellow-500" />
+        <MetricCard value={(data.orders.PAID || 0) + (data.orders.PICKED_UP || 0)} label="Pagos" color="text-green-500" />
+        <MetricCard value={data.orders.CANCELLED || 0} label="Cancelados" color="text-red-500" />
       </div>
 
-      <h3 style={{ fontSize: 14, fontWeight: 600, color: '#64748b', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
         Financeiro
       </h3>
-      <div className="grid-3">
-        <div className="metric-card">
-          <div className="value">R$ {(data.payments.totalGross / 100).toFixed(2)}</div>
-          <div className="label">Receita Bruta</div>
-        </div>
-        <div className="metric-card">
-          <div className="value" style={{ color: '#f97316' }}>R$ {(data.payments.totalCommission / 100).toFixed(2)}</div>
-          <div className="label">Comissao FoodIME</div>
-        </div>
-        <div className="metric-card">
-          <div className="value" style={{ color: '#22c55e' }}>R$ {(data.payments.totalNet / 100).toFixed(2)}</div>
-          <div className="label">Repasse Vendedores</div>
-        </div>
+      <div className="grid grid-cols-3 gap-4">
+        <MetricCard value={`R$ ${(data.payments.gross / 100).toFixed(2)}`} label="Receita Bruta" />
+        <MetricCard value={`R$ ${(data.payments.commission / 100).toFixed(2)}`} label="Comissão FoodIME" color="text-primary" />
+        <MetricCard value={`R$ ${(data.payments.net / 100).toFixed(2)}`} label="Repasse Vendedores" color="text-green-500" />
       </div>
     </AdminLayout>
   );

@@ -46,12 +46,12 @@ export default function SellerStorePage() {
     }
   }
 
-  const inputClass = 'w-full h-11 bg-surface border border-border rounded-xl px-4 text-text text-sm placeholder:text-text-light focus:border-primary/60 outline-none';
+  const inputClass = 'w-full h-11 bg-surface-2 border border-border rounded-xl px-4 text-text text-sm placeholder:text-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none transition-all';
   const isPending = createStore.isPending || updateStore.isPending;
 
   return (
-    <div className="px-5 pt-4 pb-8">
-      <h1 className="text-xl font-bold text-text mb-5">
+    <div className="px-5 pt-4 pb-8 animate-slide-up">
+      <h1 className="text-2xl font-serif text-text mb-5">
         {store ? 'Configurações da loja' : 'Criar sua loja'}
       </h1>
 
@@ -67,9 +67,9 @@ export default function SellerStorePage() {
         <>
           {/* Status toggle */}
           {store && (
-            <div className="flex items-center justify-between bg-surface rounded-2xl border border-border px-4 py-3 mb-5">
+            <div className="flex items-center justify-between bg-surface rounded-xl border border-border px-4 py-3 mb-5">
               <div>
-                <p className="text-text font-semibold text-sm">{store.name}</p>
+                <p className="text-text font-serif text-sm">{store.name}</p>
                 <p className={`text-xs font-semibold mt-0.5 ${store.isOpen ? 'text-success' : 'text-error'}`}>
                   {store.isOpen ? 'Aberta' : 'Fechada'}
                 </p>
@@ -101,7 +101,7 @@ export default function SellerStorePage() {
                 Descrição *
               </label>
               <textarea
-                className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-text text-sm placeholder:text-text-light focus:border-primary/60 outline-none resize-none"
+                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-3 text-text text-sm placeholder:text-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none resize-none transition-all"
                 rows={3}
                 placeholder="Doces caseiros feitos com amor"
                 value={form.description}
@@ -128,7 +128,7 @@ export default function SellerStorePage() {
                 disabled={!!store}
               />
               {store && (
-                <p className="text-text-light text-[11px] mt-1">A chave PIX não pode ser alterada após criação.</p>
+                <p className="text-text-muted text-[11px] mt-1">A chave PIX não pode ser alterada após criação.</p>
               )}
             </div>
 
@@ -151,9 +151,9 @@ export default function SellerStorePage() {
             <button
               type="submit"
               disabled={isPending}
-              className="w-full h-12 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-2xl font-bold transition-colors"
+              className="w-full h-12 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-xl font-bold shadow-warm hover:shadow-glow transition-all"
             >
-              {isPending ? 'Salvando...' : saved ? '✓ Salvo!' : store ? 'Salvar alterações' : 'Criar loja'}
+              {isPending ? 'Salvando...' : saved ? 'Salvo!' : store ? 'Salvar alterações' : 'Criar loja'}
             </button>
           </form>
         </>

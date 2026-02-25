@@ -10,9 +10,11 @@ const config: Config = {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#f97316',
-          light: '#fdba74',
+          DEFAULT: '#D4752E',
+          light: '#E8923F',
+          dark: '#B85E1E',
         },
+        sidebar: '#2A1F16',
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -42,6 +44,10 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+      },
+      fontFamily: {
+        serif: ['DM Serif Display', 'Georgia', 'serif'],
+        sans: ['DM Sans', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         lg: 'var(--radius)',
