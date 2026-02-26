@@ -213,6 +213,64 @@ export class AdminService {
     };
   }
 
+  async getPayoutOverview() {
+    const stores = await this.prisma.store.findMany({
+      include: { owner: { select: { name: true } } },
+    });
+
+    const result = await Promise.all(
+      stores.map(async (store) => {
+        const [earned, paid] = await Promise.all([
+          this.prisma.payment.aggregate({
+            where: { order: { storeId: store.id }, status: 'PAID' },
+            _sum: { netAmount: true },
+          }),
+          this.prisma.payout.aggregate({
+            where: { storeId: store.id },
+            _sum: { amount: true },
+          }),
+        ]);
+
+        const totalEarned = Number(earned._sum.netAmount || 0);
+        const totalPaid = Number(paid._sum.amount || 0);
+
+        return {
+          storeId: store.id,
+          storeName: store.name,
+          sellerName: store.owner.name,
+          totalEarned,
+          totalPaid,
+          balance: totalEarned - totalPaid,
+        };
+      }),
+    );
+
+    return { data: result };
+  }
+
+  async createPayout(storeId: string, amount: number, note?: string) {
+    const store = await this.prisma.store.findUniqueOrThrow({ where: { id: storeId } });
+
+    if (amount <= 0) {
+      throw new BadRequestException('Valor do repasse deve ser positivo');
+    }
+
+    const payout = await this.prisma.payout.create({
+      data: { storeId: store.id, amount, note },
+    });
+
+    return { data: payout };
+  }
+
+  async getStorePayouts(storeId: string) {
+    const payouts = await this.prisma.payout.findMany({
+      where: { storeId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return { data: payouts };
+  }
+
   async getDashboardOverview() {
     // Limpar pedidos PENDING expirados (>20min) antes de contar
     const cutoff = new Date(Date.now() - 20 * 60 * 1000);

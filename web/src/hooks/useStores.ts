@@ -2,10 +2,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { storeService } from '@/services/store.service';
 
-export function useStores() {
+export function useStores(search?: string) {
   return useQuery({
-    queryKey: ['stores', 'active'],
-    queryFn: storeService.getAll,
+    queryKey: ['stores', search || 'active'],
+    queryFn: () => storeService.getAll(search),
     staleTime: 30_000,
   });
 }

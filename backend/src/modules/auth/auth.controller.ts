@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Patch, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
@@ -47,5 +47,14 @@ export class AuthController {
     @Body() body: { refreshToken?: string },
   ) {
     return this.authService.logout(user.id, body.refreshToken);
+  }
+
+  @Patch('push-token')
+  @UseGuards(JwtAuthGuard)
+  updatePushToken(
+    @CurrentUser() user: UserPayload,
+    @Body('pushToken') pushToken: string,
+  ) {
+    return this.authService.updatePushToken(user.id, pushToken);
   }
 }

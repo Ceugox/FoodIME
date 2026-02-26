@@ -31,9 +31,18 @@ export class StoresService {
     return { data: store };
   }
 
-  async findAll() {
+  async findAll(search?: string) {
+    const where = search
+      ? {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' as const } },
+            { description: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : { isOpen: true };
+
     const stores = await this.prisma.store.findMany({
-      where: { isOpen: true },
+      where,
       include: {
         products: {
           where: { isAvailable: true },

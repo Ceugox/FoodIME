@@ -11,8 +11,10 @@ interface CreateStoreParams {
 }
 
 export const storeService = {
-  getAll: () =>
-    api.get<ApiResponse<Store[]>>('/stores').then((r) => r.data.data),
+  getAll: (search?: string) =>
+    api
+      .get<ApiResponse<Store[]>>('/stores', { params: search ? { search } : undefined })
+      .then((r) => r.data.data),
 
   getById: (id: string) =>
     api.get<ApiResponse<Store>>(`/stores/${id}`).then((r) => r.data.data),

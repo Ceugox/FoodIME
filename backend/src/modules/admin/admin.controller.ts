@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -71,5 +72,22 @@ export class AdminController {
     @Query('status') status?: string,
   ) {
     return this.adminService.getTransactions(method, status);
+  }
+
+  @Get('payouts')
+  getPayoutOverview() {
+    return this.adminService.getPayoutOverview();
+  }
+
+  @Post('payouts')
+  createPayout(
+    @Body() body: { storeId: string; amount: number; note?: string },
+  ) {
+    return this.adminService.createPayout(body.storeId, body.amount, body.note);
+  }
+
+  @Get('payouts/:storeId')
+  getStorePayouts(@Param('storeId') storeId: string) {
+    return this.adminService.getStorePayouts(storeId);
   }
 }

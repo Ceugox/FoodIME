@@ -17,7 +17,8 @@
       "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/web && npm run build 2>&1)",
       "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/backend && npx prisma@6 migrate dev --name \"security_hardening_indexes_refresh_tokens\" 2>&1)",
       "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/backend && npx prisma@6 db push 2>&1)",
-      "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/backend && npm run build 2>&1)"
+      "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/backend && npm run build 2>&1)",
+      "Bash(cd:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

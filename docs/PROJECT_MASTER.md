@@ -430,7 +430,7 @@ CONFIRMAÇÃO (transação Prisma atômica):
 - [x] Admin: dashboard individual de cada vendedor
 - [x] Admin: histórico de compras de cada comprador
 - [x] Admin: visão geral de todas as transações com filtros
-- [ ] Admin: painel de splits realizados com opção de bloqueio manual
+- [x] Admin: painel de repasses (saldo devedor por vendedor, registrar repasse, histórico)
 
 ### Sprint 9 — Polish, Testes e Beta
 - [ ] Testes de integração nos fluxos críticos (compra, webhook, estoque)
@@ -489,15 +489,16 @@ ADMIN_PASSWORD_HASH=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
-### [2026-02-25] SPRINT A: Security hardening, índices DB, Docker, CI/CD
-- **Problema:** Múltiplas vulnerabilidades bloqueando deploy: CORS aberto (`*`), JWT secrets com fallback hardcoded, sem rate limiting, sem Helmet, GET /payments/order/:id sem ownership check, WebSocket sem autenticação, sem validação de env no startup, webhook sem proteção contra replay, sem revogação de tokens, sem índices, sem Docker, sem RLS.
-- **Solução:** CORS restrito via `CORS_ORIGINS` env; Helmet; ThrottlerModule (60 req/min global, 5 em login/register, 30 no webhook); Joi validation no startup; JWT sem fallback; ownership check em payment; WebSocket autenticado via JWT no handshake; webhook com timestamp (5min) + dedup requestId; tabela `RefreshToken` + `POST /auth/logout` + token rotation; índices em Order/OrderItem/Payment/Product; RLS em todas as tabelas Supabase; Dockerfile multi-stage; docker-compose.yml; CI/CD com type-check, Prisma diff, Docker→GHCR, web.yml, deploy.yml manual. Senha mínima 8 chars. Health `GET /health`.
-- **Arquivos:** `main.ts`, `app.module.ts`, `app.controller.ts`, `jwt.strategy.ts`, `jwt-refresh.strategy.ts`, `auth.controller.ts`, `auth.service.ts`, `register.dto.ts`, `payments.controller.ts`, `payments.service.ts`, `webhook.controller.ts`, `notifications.gateway.ts`, `notifications.module.ts`, `schema.prisma`, `Dockerfile`, `.dockerignore`, `docker-compose.yml`, `backend.yml`, `web.yml`, `deploy.yml`
+### [2026-02-25] SPRINT C: Sentry, testes unitários/E2E, Railway config, CI/CD improvements
+- **Problema:** Sem observabilidade em produção — erros passam despercebidos. Testes eram triviais (só "Hello World"). CI/CD sem cobertura de testes. Sem config de deploy.
+- **Solução:** Sentry integrado em backend (`@sentry/nestjs` com `instrument.ts` + `SentryModule.forRoot()` + `SentryGlobalFilter`), web e admin (`@sentry/nextjs` com `sentry.{client,server,edge}.config.ts` + `withSentryConfig` no `next.config.ts`); 8 unit tests para `AuthService` (register, login, logout, pushToken); E2E tests para `GET /health` e `GET /` sem precisar de DB; `railway.json` com healthcheck e restart policy; `backend.yml` atualizado com `npm test` + `npm run test:e2e`; `admin.yml` atualizado com type-check; `web.yml` atualizado com `SENTRY_AUTH_TOKEN`.
+- **Arquivos:** `backend/src/instrument.ts`, `backend/src/main.ts`, `backend/src/app.module.ts`, `backend/src/modules/auth/auth.service.spec.ts`, `backend/test/app.e2e-spec.ts`, `backend/test/health.e2e-spec.ts`, `web/sentry.{client,server,edge}.config.ts`, `web/next.config.ts`, `admin/sentry.{client,server,edge}.config.ts`, `admin/next.config.ts`, `railway.json`, `.github/workflows/backend.yml`, `.github/workflows/admin.yml`, `.github/workflows/web.yml`
 
-### [2026-02-24] Redesign visual completo — paleta warm + tipografia artesanal
-- **Problema:** Frontend web (buyer, seller) e admin usavam paleta olive/lime fria com tipografia genérica (Inter). Visual "AI slop" sem personalidade.
-- **Solução:** Redesign completo de 32 arquivos em 6 fases. Nova paleta dark warm (burnt orange #D4752E, gold #F0C05A, brown backgrounds). Tipografia DM Serif Display (headings) + DM Sans (body). Animações: fadeSlideUp com stagger cascata, scaleIn, warmPulse. Sombras quentes (shadow-warm, shadow-glow). BottomNav com frosted glass + dot indicator. Admin migrado de inline styles para Tailwind com paleta light warm (#FAF6F1). Rename global text-text-light → text-text-muted.
-- **Arquivos:** `web/tailwind.config.ts`, `web/src/app/globals.css`, `web/src/app/layout.tsx`, `admin/tailwind.config.ts`, `admin/src/app/globals.css`, `admin/src/app/layout.tsx`, 6 componentes web, 2 auth, 6 buyer, 4 seller, 8 admin, `web/src/app/offline/page.tsx`
+### [2026-02-25] SPRINT B: Image upload, store search, READY status, push notifications, admin payouts
+- **Problema:** Quatro features MVP faltando: upload de imagens de produtos, busca de lojas, status READY para pedidos prontos, notificação push ao comprador, e painel de repasses no admin.
+- **Solução:** Supabase Storage bucket `foodime-images` criado; módulo `UploadsModule` (POST /uploads/image, FileInterceptor memoryStorage, 5MB, JwtAuthGuard); busca case-insensitive em stores (`GET /stores?search=`); OrderStatus enum expandido com `READY`; pushToken no User; `PATCH /auth/push-token`; PushService chama Expo ao marcar READY; admin endpoints `GET/POST /admin/payouts`, `GET /admin/payouts/:storeId`; Web: SearchBar com debounce 400ms no home, READY status em buyer/seller orders com banner "Pronto!", upload real de foto em CreateModal; Admin: página /payouts com tabela saldo devedor + RegisterModal + HistoryModal; sidebar atualizado.
+- **Arquivos:** `uploads.service.ts`, `uploads.controller.ts`, `uploads.module.ts`, `stores.service.ts`, `stores.controller.ts`, `orders.service.ts`, `orders.module.ts`, `auth.service.ts`, `auth.controller.ts`, `admin.service.ts`, `admin.controller.ts`, `schema.prisma`, `web/home/page.tsx`, `web/orders/page.tsx`, `web/(seller)/orders/page.tsx`, `web/(seller)/products/page.tsx`, `web/upload.service.ts`, `web/models.types.ts`, `admin/payouts/page.tsx`, `admin/Sidebar.tsx`
+
 
 ---
 

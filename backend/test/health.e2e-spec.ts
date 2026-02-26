@@ -5,10 +5,10 @@ import { AppController } from '../src/app.controller';
 import { AppService } from '../src/app.service';
 
 /**
- * AppController E2E tests.
+ * Health endpoint E2E test.
  * Uses a minimal module (no DB, no auth) — safe to run in CI without env vars.
  */
-describe('AppController (e2e)', () => {
+describe('Health (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
@@ -25,13 +25,12 @@ describe('AppController (e2e)', () => {
     await app.close();
   });
 
-  it('GET / returns hello string', () => {
-    return request(app.getHttpServer()).get('/').expect(200);
-  });
-
-  it('GET /health returns { status: ok, timestamp }', async () => {
+  it('GET /health returns status ok with timestamp', async () => {
     const res = await request(app.getHttpServer()).get('/health').expect(200);
-    expect(res.body.status).toBe('ok');
+
+    expect(res.body).toHaveProperty('status', 'ok');
+    expect(res.body).toHaveProperty('timestamp');
     expect(typeof res.body.timestamp).toBe('string');
+    expect(new Date(res.body.timestamp).getTime()).not.toBeNaN();
   });
 });

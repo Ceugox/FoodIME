@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { StoresService } from './stores.service';
@@ -21,8 +22,8 @@ export class StoresController {
   constructor(private readonly storesService: StoresService) {}
 
   @Get()
-  findAll() {
-    return this.storesService.findAll();
+  findAll(@Query('search') search?: string) {
+    return this.storesService.findAll(search);
   }
 
   @Get('mine')

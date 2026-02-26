@@ -1,11 +1,12 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { useMyStore } from '@/hooks/useStores';
 import { useProducts, useCreateProduct, useUpdateStock, useRemoveProduct } from '@/hooks/useProducts';
 import { ErrorState } from '@/components/common/ErrorState';
 import { StockBadge } from '@/components/common/StockBadge';
 import { formatCurrency } from '@/lib/utils';
+import { uploadService } from '@/services/upload.service';
 import type { Product } from '@/types/models.types';
 
 function ProductCard({ product }: { product: Product }) {
@@ -101,9 +102,25 @@ function ProductCard({ product }: { product: Product }) {
 }
 
 function CreateModal({ onClose }: { onClose: () => void }) {
-  const [form, setForm] = useState({ name: '', price: '', stockQty: '', imageUrl: '' });
+  const [form, setForm] = useState({ name: '', price: '', stockQty: '' });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const create = useCreateProduct();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Imagem muito grande. Máximo 5MB.');
+      return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    setError('');
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -112,19 +129,27 @@ function CreateModal({ onClose }: { onClose: () => void }) {
       return;
     }
     try {
+      let imageUrl: string | undefined;
+      if (imageFile) {
+        setUploading(true);
+        imageUrl = await uploadService.uploadImage(imageFile);
+        setUploading(false);
+      }
       await create.mutateAsync({
         name: form.name,
         price: parseFloat(form.price),
         stockQty: parseInt(form.stockQty),
-        imageUrl: form.imageUrl || undefined,
+        imageUrl,
       });
       onClose();
     } catch (err: any) {
+      setUploading(false);
       setError(err?.response?.data?.message || 'Falha ao criar produto');
     }
   }
 
   const inputClass = 'w-full h-11 bg-surface-2 border border-border rounded-xl px-4 text-text text-sm placeholder:text-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none transition-all';
+  const isPending = uploading || create.isPending;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm px-0">
@@ -146,8 +171,29 @@ function CreateModal({ onClose }: { onClose: () => void }) {
             <input className={inputClass} type="number" placeholder="50" value={form.stockQty} onChange={(e) => setForm({ ...form, stockQty: e.target.value })} />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">URL da imagem</label>
-            <input className={inputClass} placeholder="https://..." value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} />
+            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Foto do produto</label>
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileChange} />
+            {imagePreview ? (
+              <div className="relative h-32 rounded-xl overflow-hidden border border-border bg-surface-2">
+                <Image src={imagePreview} alt="preview" fill className="object-cover" />
+                <button
+                  type="button"
+                  onClick={() => { setImageFile(null); setImagePreview(null); if (fileRef.current) fileRef.current.value = ''; }}
+                  className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="w-full h-20 rounded-xl border border-dashed border-border bg-surface-2 flex flex-col items-center justify-center gap-1 text-text-muted hover:border-primary hover:text-primary transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                <span className="text-xs">Clique para adicionar foto</span>
+              </button>
+            )}
           </div>
 
           {error && <p className="text-error text-xs bg-error/10 border border-error/30 rounded-xl px-3 py-2">{error}</p>}
@@ -156,8 +202,8 @@ function CreateModal({ onClose }: { onClose: () => void }) {
             <button type="button" onClick={onClose} className="flex-1 h-12 rounded-xl border border-border text-text-secondary font-semibold hover:border-border-hover transition-colors">
               Cancelar
             </button>
-            <button type="submit" disabled={create.isPending} className="flex-1 h-12 rounded-xl bg-primary text-white font-bold disabled:opacity-60 shadow-warm hover:shadow-glow transition-all">
-              {create.isPending ? 'Criando...' : 'Criar'}
+            <button type="submit" disabled={isPending} className="flex-1 h-12 rounded-xl bg-primary text-white font-bold disabled:opacity-60 shadow-warm hover:shadow-glow transition-all">
+              {uploading ? 'Enviando foto...' : create.isPending ? 'Criando...' : 'Criar'}
             </button>
           </div>
         </form>

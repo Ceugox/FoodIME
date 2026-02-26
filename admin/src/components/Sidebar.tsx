@@ -7,6 +7,7 @@ const links = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/users', label: 'Usuários' },
   { href: '/transactions', label: 'Transações' },
+  { href: '/payouts', label: 'Repasses' },
 ];
 
 export function Sidebar() {

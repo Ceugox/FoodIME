@@ -6,9 +6,10 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import type { Order, OrderStatus } from '@/types/models.types';
 
 const STATUS_MAP: Record<OrderStatus, { label: string; className: string }> = {
-  PENDING: { label: 'Aguardando', className: 'text-warning bg-warning/10 border-warning/30' },
-  PAID: { label: 'Pago', className: 'text-success bg-success/10 border-success/30' },
-  PICKED_UP: { label: 'Retirado', className: 'text-text-secondary bg-surface-2 border-border' },
+  PENDING:   { label: 'Aguardando', className: 'text-warning bg-warning/10 border-warning/30' },
+  PAID:      { label: 'Pago',       className: 'text-success bg-success/10 border-success/30' },
+  READY:     { label: 'Pronto!',    className: 'text-primary bg-primary/10 border-primary/30' },
+  PICKED_UP: { label: 'Retirado',  className: 'text-text-secondary bg-surface-2 border-border' },
   CANCELLED: { label: 'Cancelado', className: 'text-error bg-error/10 border-error/30' },
 };
 
@@ -35,6 +36,12 @@ function OrderCard({ order, index }: { order: Order; index: number }) {
           </p>
         ))}
       </div>
+      {order.status === 'READY' && (
+        <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-lg px-3 py-2 mb-2">
+          <span className="text-lg">🔔</span>
+          <p className="text-primary text-xs font-semibold">Seu pedido está pronto! Vá buscar em {order.store?.name}.</p>
+        </div>
+      )}
       <div className="flex justify-between items-center border-t border-border pt-2">
         <span className="text-text-muted text-xs">{formatDate(order.createdAt)}</span>
         <span className="font-serif text-accent">{formatCurrency(order.totalAmount)}</span>

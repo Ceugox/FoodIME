@@ -19,6 +19,7 @@ model User {
   phone         String
   role          Role           @default(BUYER)
   status        UserStatus     @default(ACTIVE)
+  pushToken     String?
   store         Store?
   orders        Order[]
   refreshTokens RefreshToken[]
@@ -149,6 +150,7 @@ enum UserStatus {
 enum OrderStatus {
   PENDING
   PAID
+  READY
   PICKED_UP
   CANCELLED
 }

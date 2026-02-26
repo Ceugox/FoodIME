@@ -113,6 +113,14 @@ export class AuthService {
     return { data: tokens };
   }
 
+  async updatePushToken(userId: string, pushToken: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { pushToken },
+    });
+    return { message: 'Push token atualizado' };
+  }
+
   async logout(userId: string, refreshToken?: string) {
     if (refreshToken) {
       await this.prisma.refreshToken.deleteMany({

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PushService } from '../notifications/push.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import type { UserPayload } from '../../common/decorators/current-user.decorator';
 
@@ -10,7 +11,10 @@ const PENDING_EXPIRY_MS = 20 * 60 * 1000; // 20 minutos
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly push: PushService,
+  ) {}
 
   /**
    * Deleta permanentemente pedidos PENDING com mais de 20 minutos.
@@ -132,7 +136,7 @@ export class OrdersService {
     const orders = await this.prisma.order.findMany({
       where: {
         storeId: store.id,
-        status: { in: ['PAID', 'PICKED_UP'] },
+        status: { in: ['PAID', 'READY', 'PICKED_UP'] },
       },
       include: {
         items: {
@@ -176,7 +180,10 @@ export class OrdersService {
   async updateStatus(id: string, status: string, user: UserPayload) {
     const order = await this.prisma.order.findUniqueOrThrow({
       where: { id },
-      include: { store: true },
+      include: {
+        store: true,
+        buyer: { select: { name: true, pushToken: true } },
+      },
     });
 
     if (order.store.ownerId !== user.id && user.role !== 'ADMIN') {
@@ -187,6 +194,16 @@ export class OrdersService {
       where: { id },
       data: { status: status as any },
     });
+
+    // Notificar buyer quando pedido fica pronto para retirada
+    if (status === 'READY' && order.buyer.pushToken) {
+      await this.push.sendPushNotification(
+        order.buyer.pushToken,
+        'Pedido pronto!',
+        `Seu pedido #${(order as any).code} em ${order.store.name} está pronto para retirada.`,
+        { orderId: id },
+      );
+    }
 
     return { data: updated };
   }
@@ -219,21 +236,21 @@ export class OrdersService {
       this.prisma.order.findMany({
         where: {
           storeId: store.id,
-          status: { in: ['PAID', 'PICKED_UP'] },
+          status: { in: ['PAID', 'READY', 'PICKED_UP'] },
           createdAt: { gte: startOfDay },
         },
       }),
       this.prisma.order.findMany({
         where: {
           storeId: store.id,
-          status: { in: ['PAID', 'PICKED_UP'] },
+          status: { in: ['PAID', 'READY', 'PICKED_UP'] },
           createdAt: { gte: startOfWeek },
         },
       }),
       this.prisma.order.findMany({
         where: {
           storeId: store.id,
-          status: { in: ['PAID', 'PICKED_UP'] },
+          status: { in: ['PAID', 'READY', 'PICKED_UP'] },
           createdAt: { gte: startOfMonth },
         },
       }),

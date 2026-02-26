@@ -28,6 +28,9 @@ jobs:
 
       - run: npm ci --legacy-peer-deps
 
+      - name: Type check
+        run: npx tsc --noEmit
+
       - run: npm run lint
 
       - run: npm run build

@@ -1,4 +1,6 @@
 import type { NextConfig } from 'next';
+import { withSentryConfig } from '@sentry/nextjs';
+
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
@@ -25,4 +27,9 @@ const nextConfig: NextConfig = {
   },
 };
 
-module.exports = withPWA(nextConfig);
+module.exports = withSentryConfig(withPWA(nextConfig), {
+  silent: true,
+  // Only upload source maps when SENTRY_AUTH_TOKEN is set (CI/CD)
+  dryRun: !process.env.SENTRY_AUTH_TOKEN,
+  disableLogger: true,
+});

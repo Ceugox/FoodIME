@@ -1,5 +1,5 @@
 export type Role = 'BUYER' | 'SELLER' | 'ADMIN';
-export type OrderStatus = 'PENDING' | 'PAID' | 'PICKED_UP' | 'CANCELLED';
+export type OrderStatus = 'PENDING' | 'PAID' | 'READY' | 'PICKED_UP' | 'CANCELLED';
 export type PaymentMethod = 'PIX' | 'CREDIT_CARD';
 export type PaymentStatus = 'PROCESSING' | 'PAID' | 'FAILED' | 'REFUNDED';
 

@@ -7,8 +7,9 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import type { Order, OrderStatus } from '@/types/models.types';
 
 const STATUS_MAP: Record<OrderStatus, { label: string; className: string }> = {
-  PENDING: { label: 'Pendente',  className: 'text-warning bg-warning/10 border-warning/30' },
-  PAID:    { label: 'Pago',      className: 'text-success bg-success/10 border-success/30' },
+  PENDING:   { label: 'Pendente',  className: 'text-warning bg-warning/10 border-warning/30' },
+  PAID:      { label: 'Pago',      className: 'text-success bg-success/10 border-success/30' },
+  READY:     { label: 'Pronto',    className: 'text-primary bg-primary/10 border-primary/30' },
   PICKED_UP: { label: 'Retirado', className: 'text-text-secondary bg-surface-2 border-border' },
   CANCELLED: { label: 'Cancelado', className: 'text-error bg-error/10 border-error/30' },
 };
@@ -27,9 +28,14 @@ function ConfirmDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm px-4 pb-8">
       <div className="w-full max-w-sm bg-surface rounded-xl p-6 border border-border animate-slide-up shadow-warm-lg">
-        <h3 className="text-text font-serif text-lg mb-1">Confirmar retirada</h3>
+        <h3 className="text-text font-serif text-lg mb-1">
+          {order.status === 'PAID' ? 'Marcar como pronto' : 'Confirmar retirada'}
+        </h3>
         <p className="text-text-secondary text-sm mb-5">
-          Marcar pedido <span className="text-primary font-semibold">#{order.code}</span> como retirado?
+          {order.status === 'PAID'
+            ? <>Marcar pedido <span className="text-primary font-semibold">#{order.code}</span> como pronto? O comprador será notificado.</>
+            : <>Marcar pedido <span className="text-primary font-semibold">#{order.code}</span> como retirado?</>
+          }
         </p>
         <div className="flex gap-3">
           <button
@@ -87,6 +93,14 @@ function SellerOrderCard({
         {order.status === 'PAID' && (
           <button
             onClick={() => onPickup(order)}
+            className="px-4 h-9 bg-primary text-white rounded-xl text-sm font-semibold shadow-warm hover:shadow-glow transition-all"
+          >
+            Marcar pronto
+          </button>
+        )}
+        {order.status === 'READY' && (
+          <button
+            onClick={() => onPickup(order)}
             className="px-4 h-9 bg-success text-white rounded-xl text-sm font-semibold shadow-warm hover:shadow-glow transition-all"
           >
             Marcar retirado
@@ -104,12 +118,14 @@ export default function SellerOrdersPage() {
 
   async function handleConfirmPickup() {
     if (!confirmOrder) return;
-    await updateStatus.mutateAsync({ id: confirmOrder.id, status: 'PICKED_UP' });
+    const nextStatus = confirmOrder.status === 'PAID' ? 'READY' : 'PICKED_UP';
+    await updateStatus.mutateAsync({ id: confirmOrder.id, status: nextStatus });
     setConfirmOrder(null);
   }
 
   const paid = orders?.filter((o) => o.status === 'PAID') ?? [];
-  const others = orders?.filter((o) => o.status !== 'PAID') ?? [];
+  const ready = orders?.filter((o) => o.status === 'READY') ?? [];
+  const others = orders?.filter((o) => o.status !== 'PAID' && o.status !== 'READY') ?? [];
 
   return (
     <div className="px-5 pt-4 animate-slide-up">
@@ -131,9 +147,19 @@ export default function SellerOrdersPage() {
           {paid.length > 0 && (
             <div className="mb-4">
               <p className="text-xs font-bold text-success uppercase tracking-wider mb-3">
-                Para retirada ({paid.length})
+                Novos pedidos ({paid.length})
               </p>
               {paid.map((o) => (
+                <SellerOrderCard key={o.id} order={o} onPickup={setConfirmOrder} />
+              ))}
+            </div>
+          )}
+          {ready.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs font-bold text-primary uppercase tracking-wider mb-3">
+                Prontos para retirada ({ready.length})
+              </p>
+              {ready.map((o) => (
                 <SellerOrderCard key={o.id} order={o} onPickup={setConfirmOrder} />
               ))}
             </div>
