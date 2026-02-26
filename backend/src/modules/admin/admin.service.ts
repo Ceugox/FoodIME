@@ -1,15 +1,18 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-
-const PENDING_EXPIRY_MS = 20 * 60 * 1000;
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
-  async getUsers(role?: string, search?: string) {
+  async getUsers(role?: string, search?: string, status?: string) {
     const where: any = {};
     if (role) where.role = role;
+    if (status) where.status = status;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -25,6 +28,8 @@ export class AdminService {
         email: true,
         phone: true,
         role: true,
+        status: true,
+        emailVerified: true,
         createdAt: true,
         _count: { select: { orders: true } },
       },
@@ -32,6 +37,28 @@ export class AdminService {
     });
 
     return { data: users };
+  }
+
+  async updateUserStatus(id: string, status: 'ACTIVE' | 'BLOCKED', reason?: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id },
+      include: { store: true },
+    });
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { status },
+      select: { id: true, name: true, email: true, role: true, status: true },
+    });
+
+    if (status === 'ACTIVE' && user.role === 'SELLER') {
+      const storeName = user.store?.name || 'sua loja';
+      await this.emailService.sendSellerApprovedEmail(user.email, storeName);
+    } else if (status === 'BLOCKED') {
+      await this.emailService.sendSellerRejectedEmail(user.email, reason);
+    }
+
+    return { data: updated };
   }
 
   async getUser(id: string) {

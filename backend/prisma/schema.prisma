@@ -12,18 +12,22 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  password      String
-  name          String
-  phone         String
-  role          Role           @default(BUYER)
-  status        UserStatus     @default(ACTIVE)
-  pushToken     String?
-  store         Store?
-  orders        Order[]
-  refreshTokens RefreshToken[]
-  createdAt     DateTime       @default(now())
+  id                      String         @id @default(uuid())
+  email                   String         @unique
+  password                String?
+  name                    String
+  phone                   String
+  role                    Role           @default(BUYER)
+  status                  UserStatus     @default(PENDING)
+  emailVerified           Boolean        @default(false)
+  emailVerificationToken  String?        @unique
+  emailVerificationExpiry DateTime?
+  googleId                String?        @unique
+  pushToken               String?
+  store                   Store?
+  orders                  Order[]
+  refreshTokens           RefreshToken[]
+  createdAt               DateTime       @default(now())
 }
 
 model RefreshToken {

@@ -1,13 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 
-// Mock bcrypt at module level — avoids Object.defineProperty issues with spyOn
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('$2b$10$hashedpassword'),
   compare: jest.fn(),
+}));
+jest.mock('uuid', () => ({
+  v4: jest.fn().mockReturnValue('mock-uuid-token'),
 }));
 import * as bcrypt from 'bcrypt';
 
@@ -18,8 +22,12 @@ const mockUser = {
   password: '$2b$10$hashedpassword',
   phone: '21999999999',
   role: 'BUYER' as const,
-  pushToken: null,
   status: 'ACTIVE' as const,
+  emailVerified: true,
+  emailVerificationToken: null,
+  emailVerificationExpiry: null,
+  googleId: null,
+  pushToken: null,
   createdAt: new Date(),
 };
 
@@ -27,6 +35,7 @@ const mockPrisma = {
   user: {
     findUnique: jest.fn(),
     findUniqueOrThrow: jest.fn(),
+    findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
   },
@@ -42,6 +51,16 @@ const mockJwt = {
   signAsync: jest.fn().mockResolvedValue('mock-token'),
 };
 
+const mockEmail = {
+  sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+  sendSellerApprovedEmail: jest.fn().mockResolvedValue(undefined),
+  sendSellerRejectedEmail: jest.fn().mockResolvedValue(undefined),
+};
+
+const mockConfig = {
+  get: jest.fn().mockReturnValue('mock-google-client-id'),
+};
+
 describe('AuthService', () => {
   let service: AuthService;
 
@@ -51,13 +70,13 @@ describe('AuthService', () => {
         AuthService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: JwtService, useValue: mockJwt },
+        { provide: EmailService, useValue: mockEmail },
+        { provide: ConfigService, useValue: mockConfig },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
     jest.clearAllMocks();
-
-    // Default: refreshToken.create returns successfully
     mockPrisma.refreshToken.create.mockResolvedValue({ id: 'rt-1', token: 'mock-token' });
   });
 
@@ -70,16 +89,15 @@ describe('AuthService', () => {
       role: 'BUYER' as const,
     };
 
-    it('creates user and returns tokens when email is not taken', async () => {
+    it('creates user and returns verification message', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue(mockUser);
 
       const result = await service.register(dto);
 
       expect(mockPrisma.user.create).toHaveBeenCalledTimes(1);
-      expect(result.data).toHaveProperty('accessToken');
-      expect(result.data).toHaveProperty('refreshToken');
-      expect(result.data.user.email).toBe('joao@test.com');
+      expect(result.message).toContain('Verifique seu email');
+      expect(mockEmail.sendVerificationEmail).toHaveBeenCalledWith(dto.email, 'mock-uuid-token');
     });
 
     it('throws ConflictException when email already exists', async () => {
@@ -93,7 +111,7 @@ describe('AuthService', () => {
   describe('login', () => {
     const dto = { email: 'joao@test.com', password: 'senha1234' };
 
-    it('returns tokens on valid credentials', async () => {
+    it('returns tokens on valid credentials with verified email', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
@@ -101,6 +119,31 @@ describe('AuthService', () => {
 
       expect(result.data).toHaveProperty('accessToken');
       expect(result.data.user.email).toBe('joao@test.com');
+    });
+
+    it('throws UnauthorizedException when email not verified', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ ...mockUser, emailVerified: false });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await expect(service.login(dto)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('throws ForbiddenException when seller is PENDING', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        role: 'SELLER',
+        status: 'PENDING',
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await expect(service.login(dto)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ForbiddenException when user is BLOCKED', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ ...mockUser, status: 'BLOCKED' });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await expect(service.login(dto)).rejects.toThrow(ForbiddenException);
     });
 
     it('throws UnauthorizedException when user not found', async () => {

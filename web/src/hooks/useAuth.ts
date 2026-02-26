@@ -17,13 +17,33 @@ export function useLogin() {
 }
 
 export function useRegister() {
+  return useMutation({
+    mutationFn: authService.register,
+  });
+}
+
+export function useVerifyEmail() {
+  return useMutation({
+    mutationFn: authService.verifyEmail,
+  });
+}
+
+export function useResendVerification() {
+  return useMutation({
+    mutationFn: authService.resendVerification,
+  });
+}
+
+export function useGoogleAuth() {
   const setAuth = useAuthStore((s) => s.setAuth);
 
   return useMutation({
-    mutationFn: authService.register,
+    mutationFn: authService.googleAuth,
     onSuccess: (response) => {
       const { user, accessToken, refreshToken } = response.data;
-      setAuth(user as User, accessToken, refreshToken);
+      if (accessToken && refreshToken) {
+        setAuth(user as User, accessToken, refreshToken);
+      }
     },
   });
 }

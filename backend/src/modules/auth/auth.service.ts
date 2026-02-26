@@ -1,13 +1,22 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
+import { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 import {
   JWT_ACCESS_EXPIRY,
   JWT_REFRESH_EXPIRY,
@@ -16,10 +25,17 @@ import { UserPayload } from '../../common/decorators/current-user.decorator';
 
 @Injectable()
 export class AuthService {
+  private readonly googleClient: OAuth2Client;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-  ) {}
+    private readonly emailService: EmailService,
+    private readonly config: ConfigService,
+  ) {
+    const googleClientId = this.config.get<string>('GOOGLE_CLIENT_ID');
+    this.googleClient = new OAuth2Client(googleClientId);
+  }
 
   async register(dto: RegisterDto) {
     const existing = await this.prisma.user.findUnique({
@@ -31,16 +47,61 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const verificationToken = uuidv4();
+    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    const user = await this.prisma.user.create({
+    await this.prisma.user.create({
       data: {
         name: dto.name,
         email: dto.email,
         password: hashedPassword,
         phone: dto.phone,
         role: dto.role,
+        status: 'PENDING',
+        emailVerified: false,
+        emailVerificationToken: verificationToken,
+        emailVerificationExpiry: verificationExpiry,
       },
     });
+
+    await this.emailService.sendVerificationEmail(dto.email, verificationToken);
+
+    return { message: 'Verifique seu email para ativar sua conta' };
+  }
+
+  async login(dto: LoginDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (!user || !user.password) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    const passwordValid = await bcrypt.compare(dto.password, user.password);
+
+    if (!passwordValid) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    if (!user.emailVerified) {
+      throw new UnauthorizedException('Email não verificado. Verifique sua caixa de entrada.');
+    }
+
+    if (user.status === 'BLOCKED') {
+      throw new ForbiddenException('Sua conta foi bloqueada.');
+    }
+
+    if (user.status === 'PENDING' && user.role === 'SELLER') {
+      throw new ForbiddenException('Sua conta está aguardando aprovação do administrador.');
+    }
+
+    if (user.status === 'PENDING' && user.role === 'BUYER') {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { status: 'ACTIVE' },
+      });
+    }
 
     const tokens = await this.generateTokens({
       id: user.id,
@@ -56,19 +117,138 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginDto) {
+  async verifyEmail(dto: VerifyEmailDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { emailVerificationToken: dto.token },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Token de verificação inválido.');
+    }
+
+    if (user.emailVerificationExpiry && user.emailVerificationExpiry < new Date()) {
+      throw new BadRequestException('Token de verificação expirado. Solicite um novo.');
+    }
+
+    const newStatus = user.role === 'BUYER' ? 'ACTIVE' : 'PENDING';
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpiry: null,
+        status: newStatus as any,
+      },
+    });
+
+    return {
+      data: {
+        role: user.role,
+        status: newStatus,
+        message:
+          user.role === 'BUYER'
+            ? 'Email verificado com sucesso!'
+            : 'Email verificado! Aguarde a aprovação do administrador.',
+      },
+    };
+  }
+
+  async resendVerification(dto: ResendVerificationDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
 
     if (!user) {
-      throw new UnauthorizedException('Credenciais inválidas');
+      return { message: 'Se o email existir, um novo link de verificação será enviado.' };
     }
 
-    const passwordValid = await bcrypt.compare(dto.password, user.password);
+    if (user.emailVerified) {
+      return { message: 'Email já verificado.' };
+    }
 
-    if (!passwordValid) {
-      throw new UnauthorizedException('Credenciais inválidas');
+    const verificationToken = uuidv4();
+    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: verificationToken,
+        emailVerificationExpiry: verificationExpiry,
+      },
+    });
+
+    await this.emailService.sendVerificationEmail(user.email, verificationToken);
+
+    return { message: 'Se o email existir, um novo link de verificação será enviado.' };
+  }
+
+  async googleAuth(dto: GoogleAuthDto) {
+    const ticket = await this.googleClient.verifyIdToken({
+      idToken: dto.credential,
+      audience: this.config.get<string>('GOOGLE_CLIENT_ID'),
+    }).catch(() => {
+      throw new UnauthorizedException('Token Google inválido.');
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      throw new UnauthorizedException('Token Google inválido.');
+    }
+
+    const { email, name, sub: googleId } = payload;
+
+    let user = await this.prisma.user.findFirst({
+      where: { OR: [{ googleId }, { email }] },
+    });
+
+    if (user) {
+      if (!user.googleId) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { googleId, emailVerified: true },
+        });
+      }
+
+      if (user.status === 'BLOCKED') {
+        throw new ForbiddenException('Sua conta foi bloqueada.');
+      }
+
+      if (user.status === 'PENDING' && user.role === 'SELLER') {
+        throw new ForbiddenException('Sua conta está aguardando aprovação do administrador.');
+      }
+
+      if (user.status === 'PENDING' && user.role === 'BUYER') {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { status: 'ACTIVE' },
+        });
+      }
+    } else {
+      const role = dto.role || 'BUYER';
+      const status = role === 'BUYER' ? 'ACTIVE' : 'PENDING';
+
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          name: name || email.split('@')[0],
+          phone: '',
+          googleId,
+          role,
+          status,
+          emailVerified: true,
+        },
+      });
+
+      if (role === 'SELLER') {
+        return {
+          data: {
+            user: { id: user.id, name: user.name, email: user.email, role: user.role },
+            message: 'Conta criada! Aguarde a aprovação do administrador.',
+            needsApproval: true,
+          },
+        };
+      }
     }
 
     const tokens = await this.generateTokens({
@@ -135,7 +315,7 @@ export class AuthService {
   async getProfile(userPayload: UserPayload) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userPayload.id },
-      select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true },
+      select: { id: true, name: true, email: true, phone: true, role: true, status: true, emailVerified: true, createdAt: true },
     });
 
     return { data: user };

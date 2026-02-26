@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -26,13 +27,25 @@ export class AdminController {
   }
 
   @Get('users')
-  getUsers(@Query('role') role?: string, @Query('search') search?: string) {
-    return this.adminService.getUsers(role, search);
+  getUsers(
+    @Query('role') role?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.adminService.getUsers(role, search, status);
   }
 
   @Get('users/:id')
   getUser(@Param('id') id: string) {
     return this.adminService.getUser(id);
+  }
+
+  @Patch('users/:id/status')
+  updateUserStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserStatusDto,
+  ) {
+    return this.adminService.updateUserStatus(id, dto.status, dto.reason);
   }
 
   @Patch('users/:id')

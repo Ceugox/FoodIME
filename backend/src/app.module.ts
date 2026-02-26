@@ -16,6 +16,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { AdminModule } from './modules/admin/admin.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { SupabaseModule } from './supabase/supabase.module';
+import { EmailModule } from './modules/email/email.module';
 
 @Module({
   imports: [
@@ -28,6 +29,9 @@ import { SupabaseModule } from './supabase/supabase.module';
         JWT_REFRESH_SECRET: Joi.string().required().min(32),
         MERCADOPAGO_ACCESS_TOKEN: Joi.string().required(),
         MERCADOPAGO_WEBHOOK_SECRET: Joi.string().required(),
+        RESEND_API_KEY: Joi.string().optional(),
+        FRONTEND_URL: Joi.string().default('http://localhost:3001'),
+        GOOGLE_CLIENT_ID: Joi.string().optional(),
         CORS_ORIGINS: Joi.string().default('http://localhost:3001'),
         NODE_ENV: Joi.string()
           .valid('development', 'staging', 'production')
@@ -43,6 +47,7 @@ import { SupabaseModule } from './supabase/supabase.module';
     ]),
     PrismaModule,
     SupabaseModule,
+    EmailModule,
     AuthModule,
     StoresModule,
     ProductsModule,

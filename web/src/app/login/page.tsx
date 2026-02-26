@@ -3,23 +3,63 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useLogin } from '@/hooks/useAuth';
+import { GoogleLogin } from '@react-oauth/google';
+import { useLogin, useGoogleAuth, useResendVerification } from '@/hooks/useAuth';
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [showResend, setShowResend] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
   const login = useLogin();
+  const googleAuth = useGoogleAuth();
+  const resend = useResendVerification();
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    setShowResend(false);
     try {
       const result = await login.mutateAsync(form);
       const role = result.data.user.role;
       router.replace(role === 'SELLER' ? '/dashboard' : '/home');
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Email ou senha incorretos');
+      const msg = err?.response?.data?.message || 'Email ou senha incorretos';
+      setError(msg);
+      if (msg.includes('não verificado')) {
+        setShowResend(true);
+        setResendEmail(form.email);
+      }
+    }
+  }
+
+  async function handleGoogleSuccess(credentialResponse: any) {
+    setError('');
+    setShowResend(false);
+    try {
+      const result = await googleAuth.mutateAsync({
+        credential: credentialResponse.credential,
+      });
+      if (result.data.needsApproval) {
+        setError('Conta criada! Aguarde a aprovação do administrador.');
+        return;
+      }
+      const role = result.data.user.role;
+      router.replace(role === 'SELLER' ? '/dashboard' : '/home');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Erro ao entrar com Google');
+    }
+  }
+
+  async function handleResend() {
+    try {
+      await resend.mutateAsync(resendEmail);
+      setError('');
+      setShowResend(false);
+      setError('Email de verificação reenviado!');
+    } catch {
+      // silent fail — message is generic on purpose
     }
   }
 
@@ -70,6 +110,17 @@ export default function LoginPage() {
             </div>
           )}
 
+          {showResend && (
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resend.isPending}
+              className="w-full text-sm text-accent font-semibold hover:underline disabled:opacity-50"
+            >
+              {resend.isPending ? 'Reenviando...' : 'Reenviar email de verificação'}
+            </button>
+          )}
+
           <button
             type="submit"
             disabled={login.isPending}
@@ -78,6 +129,27 @@ export default function LoginPage() {
             {login.isPending ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
+
+        {/* Google OAuth */}
+        {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
+          <>
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-text-muted text-xs">ou</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Erro ao entrar com Google')}
+                text="signin_with"
+                shape="pill"
+                size="large"
+                width="350"
+              />
+            </div>
+          </>
+        )}
 
         <p className="text-center text-text-secondary text-sm mt-6">
           Não tem conta?{' '}

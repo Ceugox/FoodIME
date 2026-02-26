@@ -3,27 +3,74 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useRegister } from '@/hooks/useAuth';
+import { GoogleLogin } from '@react-oauth/google';
+import { useRegister, useGoogleAuth } from '@/hooks/useAuth';
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', role: 'BUYER' as 'BUYER' | 'SELLER' });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
   const register = useRegister();
+  const googleAuth = useGoogleAuth();
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     try {
-      const result = await register.mutateAsync(form);
-      const role = result.data.user.role;
-      router.replace(role === 'SELLER' ? '/dashboard' : '/home');
+      await register.mutateAsync(form);
+      setSuccess(true);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Erro ao criar conta');
     }
   }
 
+  async function handleGoogleSuccess(credentialResponse: any) {
+    setError('');
+    try {
+      const result = await googleAuth.mutateAsync({
+        credential: credentialResponse.credential,
+        role: form.role,
+      });
+      if (result.data.needsApproval) {
+        setSuccess(true);
+        return;
+      }
+      const role = result.data.user.role;
+      router.replace(role === 'SELLER' ? '/dashboard' : '/home');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Erro ao entrar com Google');
+    }
+  }
+
   const inputClass = 'w-full h-12 bg-surface-2 border border-border rounded-xl px-4 text-text placeholder:text-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none text-sm transition-all';
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6">
+        <div className="w-full max-w-sm animate-slide-up text-center">
+          <div className="w-16 h-16 bg-success/15 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-serif text-text mb-2">Verifique seu email</h1>
+          <p className="text-text-secondary text-sm mb-2">
+            Enviamos um link de verificação para <strong className="text-text">{form.email}</strong>
+          </p>
+          {form.role === 'SELLER' && (
+            <p className="text-text-muted text-xs mb-4 bg-warning/10 border border-warning/30 rounded-xl px-4 py-2">
+              Após verificar seu email, sua conta será analisada por um administrador antes de ser liberada.
+            </p>
+          )}
+          <p className="text-text-muted text-xs mb-6">O link expira em 24 horas.</p>
+          <Link href="/login" className="text-accent font-semibold text-sm hover:underline">
+            Ir para login
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 py-10">
@@ -86,7 +133,7 @@ export default function RegisterPage() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Senha</label>
-            <input type="password" className={inputClass} placeholder="Mín. 6 caracteres" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} />
+            <input type="password" className={inputClass} placeholder="Mín. 8 caracteres" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={8} />
           </div>
 
           {error && (
@@ -106,6 +153,27 @@ export default function RegisterPage() {
             {register.isPending ? 'Criando conta...' : 'Criar conta'}
           </button>
         </form>
+
+        {/* Google OAuth */}
+        {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
+          <>
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-text-muted text-xs">ou</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Erro ao entrar com Google')}
+                text="continue_with"
+                shape="pill"
+                size="large"
+                width="350"
+              />
+            </div>
+          </>
+        )}
 
         <p className="text-center text-text-secondary text-sm mt-6">
           Já tem conta?{' '}

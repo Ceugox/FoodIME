@@ -15,3 +15,21 @@ export interface AuthResponse {
     refreshToken: string;
   };
 }
+
+export interface VerifyEmailResponse {
+  data: {
+    role: string;
+    status: string;
+    message: string;
+  };
+}
+
+export interface GoogleAuthResponse {
+  data: {
+    user: User;
+    accessToken?: string;
+    refreshToken?: string;
+    message?: string;
+    needsApproval?: boolean;
+  };
+}
