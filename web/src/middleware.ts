@@ -2,13 +2,11 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'bff753c9-7a84-4b24-bb83-94cc5132d308',
-);
-
 async function getRole(token: string): Promise<string | null> {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return null;
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
     return (payload as { role?: string }).role ?? null;
   } catch {
     return null;

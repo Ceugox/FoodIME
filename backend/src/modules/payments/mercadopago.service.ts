@@ -4,6 +4,7 @@ import axios from 'axios';
 interface PixPaymentParams {
   amount: number;
   orderId: string;
+  payerEmail: string;
   description?: string;
 }
 
@@ -66,7 +67,7 @@ export class MercadoPagoService {
         transaction_amount: params.amount / 100, // MP expects BRL (not cents)
         description: params.description || 'Pedido FoodIME',
         payment_method_id: 'pix',
-        payer: { email: 'cliente@foodime.com' },
+        payer: { email: params.payerEmail },
         metadata: { order_id: params.orderId },
       },
       params.orderId,

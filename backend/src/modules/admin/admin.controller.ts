@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -51,9 +52,9 @@ export class AdminController {
   @Patch('users/:id')
   updateUser(
     @Param('id') id: string,
-    @Body() data: { name?: string; email?: string; phone?: string; role?: string },
+    @Body() dto: UpdateUserDto,
   ) {
-    return this.adminService.updateUser(id, data);
+    return this.adminService.updateUser(id, dto);
   }
 
   @Delete('users/:id')

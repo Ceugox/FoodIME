@@ -33,9 +33,9 @@ export class EmailService {
         subject: 'Verifique seu email — FoodIME',
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #F97316;">FoodIME</h2>
+            <h2 style="color: #6D7C3A;">FoodIME</h2>
             <p>Olá! Clique no botão abaixo para verificar seu email:</p>
-            <a href="${link}" style="display: inline-block; background: #F97316; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+            <a href="${link}" style="display: inline-block; background: #6D7C3A; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
               Verificar Email
             </a>
             <p style="margin-top: 16px; color: #666; font-size: 14px;">
@@ -65,10 +65,10 @@ export class EmailService {
         subject: 'Sua conta foi aprovada! — FoodIME',
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #F97316;">FoodIME</h2>
+            <h2 style="color: #6D7C3A;">FoodIME</h2>
             <p>Ótima notícia! Sua loja <strong>${storeName}</strong> foi aprovada.</p>
             <p>Você já pode acessar sua conta e começar a vender.</p>
-            <a href="${this.frontendUrl}/login" style="display: inline-block; background: #F97316; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+            <a href="${this.frontendUrl}/login" style="display: inline-block; background: #6D7C3A; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
               Acessar FoodIME
             </a>
           </div>
@@ -93,7 +93,7 @@ export class EmailService {
         subject: 'Atualização sobre sua conta — FoodIME',
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #F97316;">FoodIME</h2>
+            <h2 style="color: #6D7C3A;">FoodIME</h2>
             <p>Infelizmente, sua conta de vendedor não foi aprovada.</p>
             ${reason ? `<p><strong>Motivo:</strong> ${reason}</p>` : ''}
             <p>Se tiver dúvidas, entre em contato conosco.</p>

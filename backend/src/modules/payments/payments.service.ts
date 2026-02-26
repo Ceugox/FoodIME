@@ -42,6 +42,7 @@ export class PaymentsService {
       const result = await this.mercadopago.createPixPayment({
         amount: amountInCents,
         orderId,
+        payerEmail: order.buyer.email,
       });
       gatewayTxId = result.id;
       pixQrCode = result.pixQrCode;
