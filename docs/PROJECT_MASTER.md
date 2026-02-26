@@ -489,15 +489,20 @@ ADMIN_PASSWORD_HASH=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
+### [2026-02-26] Sentry Next.js 15 + Admin monetary bug fix
+- **Problema:** Sentry configurado com arquivos legados (`sentry.server/edge/client.config.ts`) incompatíveis com Next.js 15; admin dashboard/transactions/payouts exibindo valores divididos por 100 (valores em BRL foram confundidos com centavos); `RegisterModal` de payouts enviava centavos para o backend que armazena em BRL; admin sem global error handler; `onRouterTransitionStart` faltando no `instrumentation-client.ts`.
+- **Solução:** Criados `instrumentation.ts` (server+edge) e `instrumentation-client.ts` (client) para web e admin; arquivos Sentry legados esvaziados; `global-error.tsx` criado em web e admin; `onRouterTransitionStart` exportado; dashboard e transactions trocados `/100` por `.toFixed(2)` direto; `fmt()` nos payouts corrigida; `RegisterModal` envia BRL (`value`) ao invés de centavos (`Math.round(value*100)`).
+- **Arquivos:** `web/instrumentation.ts`, `web/instrumentation-client.ts`, `web/src/app/global-error.tsx`, `admin/instrumentation.ts`, `admin/instrumentation-client.ts`, `admin/src/app/global-error.tsx`, `admin/src/app/dashboard/page.tsx`, `admin/src/app/transactions/page.tsx`, `admin/src/app/payouts/page.tsx`
+
 ### [2026-02-26] Deploy Audit — 7 bugs críticos/altos corrigidos
 - **Problema:** JWT_SECRET hardcoded com UUID fixo no web middleware (falha de segurança crítica); Pix usava email fictício `cliente@foodime.com` (falha na API do Mercado Pago); PATCH /admin/users/:id sem DTO permitia escalar qualquer user para ADMIN; Prisma schema sem binaryTargets fazia build Docker em Alpine falhar; JWT_SECRET faltando em `web/.env.example`; themeColor do layout divergia do manifest.json; emails com cor antiga `#F97316`.
 - **Solução:** Middleware refeito para ler JWT_SECRET a cada request (sem fallback hardcoded); `createPixPayment` agora recebe e usa `payerEmail` real; `UpdateUserDto` criado com @IsEnum(['BUYER','SELLER']) bloqueando ADMIN; `binaryTargets = ["native", "linux-musl-openssl-3.0.x"]` adicionado ao schema.prisma; `.env.example` web/backend completados; themeColor e email colors sincronizados.
 - **Arquivos:** `web/src/middleware.ts`, `web/.env.example`, `web/src/app/layout.tsx`, `backend/prisma/schema.prisma`, `backend/src/modules/payments/mercadopago.service.ts`, `backend/src/modules/payments/payments.service.ts`, `backend/src/modules/admin/admin.controller.ts`, `backend/src/modules/admin/admin.service.ts`, `backend/src/modules/admin/dto/update-user.dto.ts`, `backend/src/modules/email/email.service.ts`, `backend/.env.example`, `web/src/app/verify-email/page.tsx`
 
-### [2026-02-26] Auth Features: Email Verification, Seller Approval, Google OAuth
-- **Problema:** Registro não verificava email; sellers podiam acessar sem aprovação; sem login social.
-- **Solução:** Migration `20260226_auth_features` (emailVerified, emailVerificationToken, emailVerificationExpiry, googleId, password nullable, status default PENDING). EmailModule global com Resend. Auth: register gera token + envia email, login checa emailVerified + status. Endpoints: POST /auth/verify-email, /resend-verification, /auth/google. Admin: PATCH /admin/users/:id/status. Web: Google OAuth via @react-oauth/google, página /verify-email.
-- **Arquivos:** `prisma/schema.prisma`, `backend/src/modules/email/*`, `backend/src/modules/auth/*`, `web/src/app/login/page.tsx`, `web/src/app/register/page.tsx`, `web/src/app/verify-email/page.tsx`, `admin/src/app/users/page.tsx`
+### [2026-02-26] Deploy Audit — 7 bugs críticos/altos corrigidos
+- **Problema:** JWT_SECRET hardcoded; email fictício no Pix; build Docker Alpine falharia (sem binaryTargets); escalação de privilégio em /admin/users/:id; themeColor desatualizado; env.examples incompletos.
+- **Solução:** Middleware sem fallback hardcoded; payerEmail real no Pix; binaryTargets adicionado ao schema; UpdateUserDto com @IsEnum(['BUYER','SELLER']); env.examples completos.
+- **Arquivos:** `web/src/middleware.ts`, `web/.env.example`, `backend/prisma/schema.prisma`, `backend/src/modules/payments/mercadopago.service.ts`, `backend/src/modules/admin/dto/update-user.dto.ts`
 
 ### [2026-02-25] SPRINT D: Deploy prep — Prisma migrations, Web features, UX improvements
 - **Problema:** Migrations Prisma desincronizadas (0_init vs schema atual); Web PWA sem toast feedback, página de detalhe do pedido, horário de funcionamento, notificação de pedido pronto; faltavam melhorias UX (offline banner, pull-to-refresh, confirmação logout); Sentry config desatualizada (dryRun removido em v9).

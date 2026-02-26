@@ -21,8 +21,8 @@ interface Payout {
   createdAt: string;
 }
 
-function fmt(cents: number) {
-  return `R$ ${(cents / 100).toFixed(2).replace('.', ',')}`;
+function fmt(brl: number) {
+  return `R$ ${brl.toFixed(2).replace('.', ',')}`;
 }
 
 function HistoryModal({
@@ -129,7 +129,7 @@ function RegisterModal({
         method: 'POST',
         body: JSON.stringify({
           storeId: store.storeId,
-          amount: Math.round(value * 100),
+          amount: value,
           note: note || undefined,
         }),
       });

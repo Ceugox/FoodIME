@@ -18,7 +18,16 @@
       "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/backend && npx prisma@6 migrate dev --name \"security_hardening_indexes_refresh_tokens\" 2>&1)",
       "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/backend && npx prisma@6 db push 2>&1)",
       "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/backend && npm run build 2>&1)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/backend && npx prisma@6 generate 2>&1)",
+      "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/backend && npx tsc --noEmit 2>&1)",
+      "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/web && rm -rf .next && npx tsc --noEmit 2>&1)",
+      "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/backend && npm run start:dev 2>&1)",
+      "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/web && npm run dev 2>&1)",
+      "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/admin && npx tsc --noEmit 2>&1)",
+      "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/web && npx tsc --noEmit 2>&1)",
+      "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/admin && npm run dev 2>&1)",
+      "Bash(curl:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

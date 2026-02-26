@@ -61,9 +61,9 @@ export default function DashboardPage() {
         Financeiro
       </h3>
       <div className="grid grid-cols-3 gap-4">
-        <MetricCard value={`R$ ${(data.payments.gross / 100).toFixed(2)}`} label="Receita Bruta" />
-        <MetricCard value={`R$ ${(data.payments.commission / 100).toFixed(2)}`} label="Comissão FoodIME" color="text-primary" />
-        <MetricCard value={`R$ ${(data.payments.net / 100).toFixed(2)}`} label="Repasse Vendedores" color="text-green-500" />
+        <MetricCard value={`R$ ${data.payments.gross.toFixed(2)}`} label="Receita Bruta" />
+        <MetricCard value={`R$ ${data.payments.commission.toFixed(2)}`} label="Comissão FoodIME" color="text-primary" />
+        <MetricCard value={`R$ ${data.payments.net.toFixed(2)}`} label="Repasse Vendedores" color="text-green-500" />
       </div>
     </AdminLayout>
   );

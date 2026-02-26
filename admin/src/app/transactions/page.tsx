@@ -100,9 +100,9 @@ export default function TransactionsPage() {
 
       {data && (
         <div className="grid grid-cols-3 gap-4 mb-6">
-          <MetricCard value={`R$ ${(data.totals.gross / 100).toFixed(2)}`} label="Total Bruto" />
-          <MetricCard value={`R$ ${(data.totals.commission / 100).toFixed(2)}`} label="Comissão" color="text-primary" />
-          <MetricCard value={`R$ ${(data.totals.net / 100).toFixed(2)}`} label="Repasse" color="text-green-500" />
+          <MetricCard value={`R$ ${data.totals.gross.toFixed(2)}`} label="Total Bruto" />
+          <MetricCard value={`R$ ${data.totals.commission.toFixed(2)}`} label="Comissão" color="text-primary" />
+          <MetricCard value={`R$ ${data.totals.net.toFixed(2)}`} label="Repasse" color="text-green-500" />
         </div>
       )}
 
@@ -132,8 +132,8 @@ export default function TransactionsPage() {
                   <td className="px-4 py-3 text-sm text-muted-foreground">{tx.buyerName}</td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">{tx.storeName}</td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">{methodLabels[tx.method] || tx.method}</td>
-                  <td className="px-4 py-3 text-sm text-foreground">R$ {((tx.grossAmount || 0) / 100).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-sm text-primary">R$ {((tx.commission || 0) / 100).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-sm text-foreground">R$ {(tx.grossAmount || 0).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-sm text-primary">R$ {(tx.commission || 0).toFixed(2)}</td>
                   <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(tx.createdAt).toLocaleDateString('pt-BR')}</td>
                 </tr>
