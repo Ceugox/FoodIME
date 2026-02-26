@@ -5,6 +5,8 @@ import { OrderCardSkeleton } from '@/components/common/LoadingSkeleton';
 import { ErrorState } from '@/components/common/ErrorState';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import type { Order, OrderStatus } from '@/types/models.types';
+import { toast } from '@/hooks/useToast';
+import { RefreshButton } from '@/components/common/RefreshButton';
 
 const STATUS_MAP: Record<OrderStatus, { label: string; className: string }> = {
   PENDING:   { label: 'Pendente',  className: 'text-warning bg-warning/10 border-warning/30' },
@@ -119,7 +121,12 @@ export default function SellerOrdersPage() {
   async function handleConfirmPickup() {
     if (!confirmOrder) return;
     const nextStatus = confirmOrder.status === 'PAID' ? 'READY' : 'PICKED_UP';
-    await updateStatus.mutateAsync({ id: confirmOrder.id, status: nextStatus });
+    try {
+      await updateStatus.mutateAsync({ id: confirmOrder.id, status: nextStatus });
+      toast({ title: nextStatus === 'READY' ? 'Pedido marcado como pronto' : 'Pedido marcado como retirado', variant: 'success' });
+    } catch {
+      toast({ title: 'Erro ao atualizar pedido', variant: 'error' });
+    }
     setConfirmOrder(null);
   }
 
@@ -129,7 +136,10 @@ export default function SellerOrdersPage() {
 
   return (
     <div className="px-5 pt-4 animate-slide-up">
-      <h1 className="text-2xl font-serif text-text mb-5">Pedidos</h1>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-serif text-text">Pedidos</h1>
+        <RefreshButton onRefresh={refetch} />
+      </div>
 
       {isLoading ? (
         Array.from({ length: 3 }).map((_, i) => <OrderCardSkeleton key={i} />)

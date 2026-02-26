@@ -46,6 +46,8 @@ model Store {
   pixKey         String
   commissionRate Decimal   @default(0.10)
   isOpen         Boolean   @default(false)
+  openTime       String?
+  closeTime      String?
   products       Product[]
   orders         Order[]
   payouts        Payout[]

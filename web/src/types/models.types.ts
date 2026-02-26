@@ -22,6 +22,8 @@ export interface Store {
   pixKey: string;
   commissionRate: number;
   isOpen: boolean;
+  openTime?: string;
+  closeTime?: string;
   products?: Product[];
   owner?: { id: string; name: string };
 }

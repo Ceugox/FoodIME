@@ -8,6 +8,7 @@ import { StockBadge } from '@/components/common/StockBadge';
 import { formatCurrency } from '@/lib/utils';
 import { uploadService } from '@/services/upload.service';
 import type { Product } from '@/types/models.types';
+import { toast } from '@/hooks/useToast';
 
 function ProductCard({ product }: { product: Product }) {
   const updateStock = useUpdateStock();
@@ -87,7 +88,7 @@ function ProductCard({ product }: { product: Product }) {
                 Cancelar
               </button>
               <button
-                onClick={() => { remove.mutate(product.id); setRemoving(false); }}
+                onClick={() => { remove.mutate(product.id, { onSuccess: () => toast({ title: 'Produto removido', variant: 'success' }), onError: () => toast({ title: 'Erro ao remover produto', variant: 'error' }) }); setRemoving(false); }}
                 disabled={remove.isPending}
                 className="flex-1 h-11 rounded-xl bg-error text-white text-sm font-bold disabled:opacity-60"
               >
@@ -141,6 +142,7 @@ function CreateModal({ onClose }: { onClose: () => void }) {
         stockQty: parseInt(form.stockQty),
         imageUrl,
       });
+      toast({ title: 'Produto criado!', variant: 'success' });
       onClose();
     } catch (err: any) {
       setUploading(false);

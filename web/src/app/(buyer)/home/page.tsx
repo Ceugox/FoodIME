@@ -6,6 +6,7 @@ import { useStores } from '@/hooks/useStores';
 import { StoreCardSkeleton } from '@/components/common/LoadingSkeleton';
 import { ErrorState } from '@/components/common/ErrorState';
 import type { Store } from '@/types/models.types';
+import { RefreshButton } from '@/components/common/RefreshButton';
 
 function SearchBar({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
@@ -68,7 +69,7 @@ function StoreCard({ store, index }: { store: Store; index: number }) {
                 : 'text-text-muted bg-surface-2'
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full inline-block ${store.isOpen ? 'bg-success' : 'bg-text-muted'}`} />
-              {store.isOpen ? 'Aberto' : 'Fechado'}
+              {store.isOpen ? 'Aberto' : store.openTime ? `Abre às ${store.openTime}` : 'Fechado'}
             </span>
           </div>
         </div>
@@ -104,8 +105,11 @@ export default function HomePage() {
             {search ? `Resultados para "${search}"` : 'Vendedores abertos agora'}
           </p>
         </div>
-        <div className="h-10 w-[74px] rounded-xl overflow-hidden border border-border flex items-center justify-center bg-surface">
-          <Image src="/logo.png" alt="FoodIME" width={74} height={40} className="object-contain w-full h-full" />
+        <div className="flex items-center gap-2">
+          <RefreshButton onRefresh={refetch} />
+          <div className="h-10 w-[74px] rounded-xl overflow-hidden border border-border flex items-center justify-center bg-surface">
+            <Image src="/logo.png" alt="FoodIME" width={74} height={40} className="object-contain w-full h-full" />
+          </div>
         </div>
       </div>
 

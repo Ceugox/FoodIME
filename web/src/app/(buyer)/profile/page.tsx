@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useLogout } from '@/hooks/useAuth';
@@ -7,6 +8,7 @@ export default function ProfilePage() {
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
   const logout = useLogout();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   function handleLogout() {
     logout();
@@ -44,11 +46,34 @@ export default function ProfilePage() {
 
       {/* Logout */}
       <button
-        onClick={handleLogout}
+        onClick={() => setShowLogoutConfirm(true)}
         className="w-full h-12 rounded-xl border border-error/40 text-error font-semibold hover:bg-error/10 transition-all"
       >
         Sair da conta
       </button>
+
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm px-4 pb-8">
+          <div className="w-full max-w-sm bg-surface rounded-xl p-6 border border-border animate-slide-up shadow-warm-lg">
+            <h3 className="text-text font-serif text-lg mb-1">Sair da conta</h3>
+            <p className="text-text-secondary text-sm mb-5">Tem certeza que deseja sair?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 h-11 rounded-xl border border-border text-text-secondary text-sm font-semibold hover:border-border-hover transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex-1 h-11 rounded-xl bg-error text-white text-sm font-bold"
+              >
+                Sair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

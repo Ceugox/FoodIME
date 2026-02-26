@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useMyStore, useCreateStore, useUpdateStore, useToggleStoreOpen } from '@/hooks/useStores';
 import { ErrorState } from '@/components/common/ErrorState';
+import { toast } from '@/hooks/useToast';
 
 export default function SellerStorePage() {
   const { data: store, isLoading, isError, refetch } = useMyStore();
@@ -9,8 +10,7 @@ export default function SellerStorePage() {
   const updateStore = useUpdateStore();
   const toggleOpen = useToggleStoreOpen();
 
-  const [form, setForm] = useState({ name: '', description: '', whatsapp: '', pixKey: '', imageUrl: '' });
-  const [saved, setSaved] = useState(false);
+  const [form, setForm] = useState({ name: '', description: '', whatsapp: '', pixKey: '', imageUrl: '', openTime: '', closeTime: '' });
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -21,6 +21,8 @@ export default function SellerStorePage() {
         whatsapp: store.whatsapp,
         pixKey: store.pixKey,
         imageUrl: store.imageUrl || '',
+        openTime: store.openTime || '',
+        closeTime: store.closeTime || '',
       });
     }
   }, [store]);
@@ -33,16 +35,22 @@ export default function SellerStorePage() {
       return;
     }
     try {
-      const payload = { ...form, imageUrl: form.imageUrl || undefined };
+      const payload = {
+        ...form,
+        imageUrl: form.imageUrl || undefined,
+        openTime: form.openTime || undefined,
+        closeTime: form.closeTime || undefined,
+      };
       if (store) {
         await updateStore.mutateAsync({ id: store.id, ...payload });
       } else {
         await createStore.mutateAsync(payload);
       }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      toast({ title: store ? 'Loja atualizada!' : 'Loja criada!', variant: 'success' });
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Erro ao salvar loja');
+      const msg = err?.response?.data?.message || 'Erro ao salvar loja';
+      setError(msg);
+      toast({ title: msg, variant: 'error' });
     }
   }
 
@@ -139,6 +147,31 @@ export default function SellerStorePage() {
               <input className={inputClass} placeholder="https://..." value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} />
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
+                  Abre às
+                </label>
+                <input
+                  type="time"
+                  className={inputClass}
+                  value={form.openTime}
+                  onChange={(e) => setForm({ ...form, openTime: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
+                  Fecha às
+                </label>
+                <input
+                  type="time"
+                  className={inputClass}
+                  value={form.closeTime}
+                  onChange={(e) => setForm({ ...form, closeTime: e.target.value })}
+                />
+              </div>
+            </div>
+
             {error && (
               <div className="flex items-center gap-2 bg-error/10 border border-error/30 rounded-xl px-4 py-2.5">
                 <svg className="w-4 h-4 text-error flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -153,7 +186,7 @@ export default function SellerStorePage() {
               disabled={isPending}
               className="w-full h-12 bg-primary hover:bg-primary-light disabled:opacity-60 text-white rounded-xl font-bold shadow-warm hover:shadow-glow transition-all"
             >
-              {isPending ? 'Salvando...' : saved ? 'Salvo!' : store ? 'Salvar alterações' : 'Criar loja'}
+              {isPending ? 'Salvando...' : store ? 'Salvar alterações' : 'Criar loja'}
             </button>
           </form>
         </>

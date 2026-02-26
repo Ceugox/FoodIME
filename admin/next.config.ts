@@ -7,7 +7,8 @@ const nextConfig: NextConfig = {
 
 export default withSentryConfig(nextConfig, {
   silent: true,
-  // Only upload source maps when SENTRY_AUTH_TOKEN is set (CI/CD)
-  dryRun: !process.env.SENTRY_AUTH_TOKEN,
-  disableLogger: true,
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
+  telemetry: false,
 });

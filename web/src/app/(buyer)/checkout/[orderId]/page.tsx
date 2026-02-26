@@ -8,6 +8,7 @@ import { useCartStore } from '@/store/cartStore';
 import { formatCurrency } from '@/lib/utils';
 import { CreditCardForm, type CardFormData } from '@/components/payment/credit-card-form';
 import { createCardToken } from '@/services/mercadopago.service';
+import { toast } from '@/hooks/useToast';
 
 const PIX_EXPIRY_SECONDS = 15 * 60;
 
@@ -66,7 +67,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
       setPixData({ qrCode: result.pixQrCode!, base64: result.pixQrCodeBase64, startedAt: Date.now() });
       setPollPayment(true);
     } catch (err: any) {
-      alert(err?.response?.data?.message || 'Erro ao gerar PIX');
+      toast({ title: err?.response?.data?.message || 'Erro ao gerar PIX', variant: 'error' });
     }
   }
 
@@ -89,6 +90,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
         err?.response?.data?.message ||
         'Falha ao processar pagamento com cartao';
       setCardError(msg);
+      toast({ title: msg, variant: 'error' });
     } finally {
       setCardLoading(false);
     }

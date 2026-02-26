@@ -12,11 +12,12 @@ export function useCreateOrder() {
   });
 }
 
-export function useBuyerOrders() {
+export function useBuyerOrders(refetchInterval?: number | false) {
   return useQuery({
     queryKey: ['orders', 'buyer'],
     queryFn: orderService.getByBuyer,
     staleTime: 15_000,
+    refetchInterval: refetchInterval ?? false,
   });
 }
 
