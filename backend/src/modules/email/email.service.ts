@@ -5,7 +5,7 @@ import { Resend } from 'resend';
 @Injectable()
 export class EmailService {
   private readonly resend: Resend | null;
-  private readonly from = 'FoodIME <noreply@foodime.com.br>';
+  private readonly from = 'FoodIME <onboarding@resend.dev>';
   private readonly frontendUrl: string;
   private readonly logger = new Logger(EmailService.name);
 

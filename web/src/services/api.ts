@@ -19,7 +19,12 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Não interceptar 401 de endpoints de auth (login, register, etc.)
+    const isAuthEndpoint = originalRequest.url?.startsWith('/auth/login') ||
+      originalRequest.url?.startsWith('/auth/register') ||
+      originalRequest.url?.startsWith('/auth/google');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
 
       const refreshToken = useAuthStore.getState().refreshToken;

@@ -36,6 +36,7 @@
     "github",
     "supabase",
     "mobile-mcp",
-    "mercadopago"
+    "mercadopago",
+    "playwright"
   ]
 }

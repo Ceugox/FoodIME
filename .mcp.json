@@ -45,6 +45,13 @@
         "--header",
         "Authorization:Bearer TEST-871233427841137-022209-b0caca4a0dbbc16f4f73f4ea0fa2272f-3216876649"
       ]
+    },
+    "playwright": {
+      "command": "cmd",
+      "args": [
+        "/c", "npx", "-y",
+        "@playwright/mcp@latest"
+      ]
     }
   }
 }
