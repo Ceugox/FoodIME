@@ -96,6 +96,10 @@ npm run lint             # ESLint
 - Stock decrement happens inside an atomic `prisma.$transaction` after confirmation (webhook or immediate) — if stock is insufficient, automatically refund via MP API and cancel the order.
 - No `gatewayId` on Store — sellers don't need Mercado Pago accounts.
 
+## IMPORTANT: Scope Restriction
+
+**DO NOT modify any code inside the `mobile/` directory.** All current development is focused on `backend/` and `web/` (frontend Next.js). The mobile app (React Native + Expo) is frozen and should not be touched.
+
 ## Critical Business Rules
 
 - One order = one seller only (no multi-seller cart)

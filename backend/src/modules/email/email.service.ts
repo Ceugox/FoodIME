@@ -5,13 +5,14 @@ import { Resend } from 'resend';
 @Injectable()
 export class EmailService {
   private readonly resend: Resend | null;
-  private readonly from = 'FoodIME <onboarding@resend.dev>';
+  private readonly from: string;
   private readonly frontendUrl: string;
   private readonly logger = new Logger(EmailService.name);
 
   constructor(private readonly config: ConfigService) {
     const apiKey = this.config.get<string>('RESEND_API_KEY');
     this.resend = apiKey ? new Resend(apiKey) : null;
+    this.from = this.config.get<string>('EMAIL_FROM', 'FoodIME <onboarding@resend.dev>');
     this.frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3001');
     if (!apiKey) {
       this.logger.warn('RESEND_API_KEY not set — emails will be logged only');

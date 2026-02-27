@@ -21,8 +21,9 @@ interface Payout {
   createdAt: string;
 }
 
-function fmt(brl: number) {
-  return `R$ ${brl.toFixed(2).replace('.', ',')}`;
+function fmt(brl: number | string) {
+  const n = typeof brl === 'string' ? parseFloat(brl) : brl;
+  return `R$ ${(n || 0).toFixed(2).replace('.', ',')}`;
 }
 
 function HistoryModal({
