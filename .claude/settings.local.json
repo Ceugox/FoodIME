@@ -27,7 +27,9 @@
       "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/admin && npx tsc --noEmit 2>&1)",
       "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/web && npx tsc --noEmit 2>&1)",
       "Bash(cd /c/Users/marce/Documents/GitHub/FoodIME/admin && npm run dev 2>&1)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(echo EXIT: $?:*)",
+      "Bash(echo TSC exit: $?:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
