@@ -48,6 +48,18 @@ export function useGoogleAuth() {
   });
 }
 
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: authService.forgotPassword,
+  });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: authService.resetPassword,
+  });
+}
+
 export function useLogout() {
   const clearAuth = useAuthStore((s) => s.clearAuth);
   return clearAuth;

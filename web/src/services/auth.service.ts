@@ -36,6 +36,12 @@ export const authService = {
   googleAuth: (params: GoogleAuthParams) =>
     api.post<GoogleAuthResponse>('/auth/google', params).then((r) => r.data),
 
+  forgotPassword: (email: string) =>
+    api.post<{ message: string }>('/auth/forgot-password', { email }).then((r) => r.data),
+
+  resetPassword: (params: { token: string; newPassword: string }) =>
+    api.post<{ message: string }>('/auth/reset-password', params).then((r) => r.data),
+
   getProfile: () =>
     api.get<{ data: User }>('/auth/me').then((r) => r.data),
 };

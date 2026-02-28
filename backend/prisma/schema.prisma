@@ -24,6 +24,8 @@ model User {
   emailVerificationToken  String?        @unique
   emailVerificationExpiry DateTime?
   googleId                String?        @unique
+  passwordResetToken      String?        @unique
+  passwordResetExpiry     DateTime?
   pushToken               String?
   store                   Store?
   orders                  Order[]

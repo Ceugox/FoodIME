@@ -17,6 +17,8 @@ import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import {
   JWT_ACCESS_EXPIRY,
   JWT_REFRESH_EXPIRY,
@@ -291,6 +293,62 @@ export class AuthService {
     });
 
     return { data: tokens };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    // Always return generic message to prevent email enumeration
+    const genericMessage = 'Se o email estiver cadastrado, você receberá um link para redefinir sua senha.';
+
+    if (!user || !user.password) {
+      // User doesn't exist or is Google-only (no password to reset)
+      return { message: genericMessage };
+    }
+
+    const resetToken = uuidv4();
+    const resetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: resetToken,
+        passwordResetExpiry: resetExpiry,
+      },
+    });
+
+    await this.emailService.sendPasswordResetEmail(user.email, resetToken);
+
+    return { message: genericMessage };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { passwordResetToken: dto.token },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Token de redefinição inválido.');
+    }
+
+    if (user.passwordResetExpiry && user.passwordResetExpiry < new Date()) {
+      throw new BadRequestException('Token de redefinição expirado. Solicite um novo.');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpiry: null,
+      },
+    });
+
+    return { message: 'Senha redefinida com sucesso!' };
   }
 
   async updatePushToken(userId: string, pushToken: string) {

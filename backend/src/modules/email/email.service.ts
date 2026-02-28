@@ -81,6 +81,40 @@ export class EmailService {
     }
   }
 
+  async sendPasswordResetEmail(to: string, token: string) {
+    const link = `${this.frontendUrl}/reset-password?token=${token}`;
+
+    if (!this.resend) {
+      this.logger.log(`[DEV] Password reset email for ${to}: ${link}`);
+      return;
+    }
+
+    try {
+      await this.resend.emails.send({
+        from: this.from,
+        to,
+        subject: 'Redefinir senha — FoodIME',
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2 style="color: #6D7C3A;">FoodIME</h2>
+            <p>Você solicitou a redefinição da sua senha. Clique no botão abaixo:</p>
+            <a href="${link}" style="display: inline-block; background: #6D7C3A; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+              Redefinir Senha
+            </a>
+            <p style="margin-top: 16px; color: #666; font-size: 14px;">
+              Ou copie e cole este link: <br/>
+              <a href="${link}">${link}</a>
+            </p>
+            <p style="color: #999; font-size: 12px;">Este link expira em 1 hora. Se você não solicitou, ignore este email.</p>
+          </div>
+        `,
+      });
+      this.logger.log(`Password reset email sent to ${to}`);
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email to ${to}`, error);
+    }
+  }
+
   async sendSellerRejectedEmail(to: string, reason?: string) {
     if (!this.resend) {
       this.logger.log(`[DEV] Seller rejected email for ${to} (reason: ${reason || 'none'})`);
