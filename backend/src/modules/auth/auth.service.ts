@@ -319,7 +319,8 @@ export class AuthService {
       },
     });
 
-    await this.emailService.sendPasswordResetEmail(user.email, resetToken);
+    // Fire-and-forget — don't block the response
+    this.emailService.sendPasswordResetEmail(user.email, resetToken);
 
     return { message: genericMessage };
   }
