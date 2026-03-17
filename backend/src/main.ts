@@ -4,46 +4,45 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 import helmet from 'helmet';
+import { Request, Response, NextFunction } from 'express';
+
+function isOriginAllowed(origin: string): boolean {
+  // Railway subdomains (all owned by us)
+  if (origin.endsWith('.up.railway.app')) return true;
+  // Localhost for development
+  if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
+  // Explicit env var origins
+  const extra = process.env.CORS_ORIGINS;
+  if (extra) {
+    const list = extra.split(',').map((o) => o.trim().replace(/\/+$/, ''));
+    if (list.includes(origin)) return true;
+  }
+  return false;
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
-  const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim().replace(/\/+$/, ''))
-    : ['http://localhost:3001', 'http://localhost:3002'];
+  // ── Manual CORS middleware — runs BEFORE anything else (guards, Sentry, helmet) ──
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const origin = req.headers.origin as string | undefined;
 
-  console.log('CORS allowed origins:', allowedOrigins);
-  console.log('Raw CORS_ORIGINS env:', JSON.stringify(process.env.CORS_ORIGINS));
+    if (origin && isOriginAllowed(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-signature,x-request-id');
+      res.setHeader('Access-Control-Max-Age', '3600');
+    }
 
-  app.enableCors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, healthchecks)
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
-      // Allow any Railway subdomain (all owned by us)
-      if (origin.endsWith('.up.railway.app')) {
-        callback(null, true);
-        return;
-      }
-      // Allow explicitly listed origins
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
-      // Allow localhost in development
-      if (origin.match(/^https?:\/\/localhost(:\d+)?$/)) {
-        callback(null, true);
-        return;
-      }
-      console.log('CORS blocked origin:', origin);
-      callback(new Error(`Origin ${origin} not allowed by CORS`));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-signature', 'x-request-id'],
-    maxAge: 3600,
+    // Preflight: respond immediately — never let it reach guards/controllers
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+
+    next();
   });
 
   app.use(helmet({
