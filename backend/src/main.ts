@@ -9,20 +9,36 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
   const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
+    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim().replace(/\/+$/, ''))
     : ['http://localhost:3001', 'http://localhost:3002'];
 
   console.log('CORS allowed origins:', allowedOrigins);
+  console.log('Raw CORS_ORIGINS env:', JSON.stringify(process.env.CORS_ORIGINS));
 
   app.enableCors({
     origin: (origin, callback) => {
       // Allow requests with no origin (mobile apps, curl, healthchecks)
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin) {
         callback(null, true);
-      } else {
-        console.log('CORS blocked origin:', origin);
-        callback(null, false);
+        return;
       }
+      // Allow any Railway subdomain (all owned by us)
+      if (origin.endsWith('.up.railway.app')) {
+        callback(null, true);
+        return;
+      }
+      // Allow explicitly listed origins
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      // Allow localhost in development
+      if (origin.match(/^https?:\/\/localhost(:\d+)?$/)) {
+        callback(null, true);
+        return;
+      }
+      console.log('CORS blocked origin:', origin);
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -32,7 +48,8 @@ async function bootstrap() {
 
   app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
-    crossOriginOpenerPolicy: false,
+    crossOriginOpenerPolicy: { policy: 'unsafe-none' },
+    crossOriginEmbedderPolicy: false,
   }));
 
   app.useGlobalFilters(new PrismaExceptionFilter());
