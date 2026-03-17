@@ -489,15 +489,15 @@ ADMIN_PASSWORD_HASH=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
-### [2026-03-17] FoodIME V2 — Comprehensive overhaul (Phases 1-7)
-- **Problema:** Auditoria V1 identificou 134 problemas: race conditions em pagamentos, memory leak no webhook, N+1 queries, ausência de validações, testes insuficientes, falta de paginação no admin, e problemas de UX no frontend web.
-- **Solução:** Implementação completa em 7 fases: (1) Schema: indexes compostos, soft delete User/Product, AuditLog, phone nullable, refundReason. (2) Backend crítico: race condition resolvida com `$transaction` Serializable + `updateMany WHERE stockQty >= qty`, webhook `Set` → LRU cache, validação de transições de status, retry de order code, duplicate payment prevention, idempotência. (3) Backend melhorias: health check (`/health`), request logger, módulo de cupons CRUD, audit log, cron cleanup de pedidos expirados, Socket.io graceful shutdown + JWT re-verify, N+1 fixes. (4) Web frontend: 14 correções (alert→toast, cookie 7d, Socket auth, checkout race guard, cart stock validation, Luhn, ErrorBoundary, axios errors, LCP priority, safe-area, autofill dark, phone mask). (5) Admin: middleware Next.js, paginação, páginas de cupons/lojas, logout server-side. (6) Testes: 86 unit tests passando (novos para idempotência, transições, duplicatas, soft delete, pagination), rate limiting reforçado (register 3/min, forgot 2/min), Helmet + CORS strict. (7) Dockerfile com HEALTHCHECK, CI com `prisma generate`.
-- **Arquivos:** ~30 modificados, ~16 criados. Principais: `schema.prisma`, `payments.service.ts`, `webhook.controller.ts`, `orders.service.ts`, `admin.service.ts`, `auth.controller.ts`, `main.ts`, `app.module.ts`, novos módulos (health, audit, coupons, cron), `admin/src/middleware.ts`, `admin/src/app/coupons/page.tsx`, `admin/src/app/stores/page.tsx`, `web/src/components/common/ErrorBoundary.tsx`, specs atualizados.
-
 ### [2026-03-17] Full integration testing — All 3 profiles functional
 - **Problema:** (1) Cart `addItem` silently failed — `isAvailable` missing from Prisma `select`. (2) Checkout PIX timeout (Axios 10s). (3) Seller metrics 500 — `READY` enum missing from PostgreSQL. (4) Admin CORS blocked (port 3002 not in origin list). (5) All users had broken accounts (sellers PENDING, admins missing bcrypt hash). (6) Web middleware had no ADMIN role handling.
 - **Solução:** (1) Added `isAvailable: true` to store product selects. (2) Axios timeout → 30s + checkout auto-detects existing payments. (3) `ALTER TYPE "OrderStatus" ADD VALUE 'READY'` + migration tracked. (4) Added `CORS_ORIGINS=...,localhost:3002` to backend .env + code default. (5) Script fixed all users: sellers ACTIVE+emailVerified, admins bcrypt password. (6) Web middleware now redirects ADMIN→`/admin/dashboard` + protects `/admin/*` routes.
 - **Arquivos:** `stores.service.ts`, `api.ts`, `checkout/[orderId]/page.tsx`, `main.ts`, `web/src/middleware.ts`, migration `20260317_add_ready_status`, `.env`
+
+### [2026-03-17] Fix CORS — middleware before NestJS route binding
+- **Problema:** CORS middleware registrado via `app.use()` após `NestFactory.create()` ficava no stack do Express DEPOIS das rotas do NestJS. Requisições OPTIONS preflight eram processadas pelo pipeline NestJS (guards/filters) que retornava 404 sem headers CORS, antes do middleware manual executar.
+- **Solução:** Criada instância Express separada (`express()`) com CORS middleware + Helmet registrados PRIMEIRO, passada ao NestJS via `new ExpressAdapter(server)`. Garante que CORS middleware está no topo do stack, antes de qualquer rota NestJS.
+- **Arquivos:** `backend/src/main.ts`
 
 
 ---

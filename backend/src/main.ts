@@ -3,8 +3,9 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
+import { ExpressAdapter } from '@nestjs/platform-express';
 import helmet from 'helmet';
-import { Request, Response, NextFunction } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 
 function isOriginAllowed(origin: string): boolean {
   // Railway subdomains (all owned by us)
@@ -21,10 +22,11 @@ function isOriginAllowed(origin: string): boolean {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  // ── Create Express instance FIRST so CORS middleware sits at the top of the stack,
+  //    BEFORE NestJS binds its routes during create(). ──
+  const server = express();
 
-  // ── Manual CORS middleware — runs BEFORE anything else (guards, Sentry, helmet) ──
-  app.use((req: Request, res: Response, next: NextFunction) => {
+  server.use((req: Request, res: Response, next: NextFunction) => {
     const origin = req.headers.origin as string | undefined;
 
     if (origin && isOriginAllowed(origin)) {
@@ -45,11 +47,13 @@ async function bootstrap() {
     next();
   });
 
-  app.use(helmet({
+  server.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     crossOriginOpenerPolicy: { policy: 'unsafe-none' },
     crossOriginEmbedderPolicy: false,
   }));
+
+  const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { rawBody: true });
 
   app.useGlobalFilters(new PrismaExceptionFilter());
 
