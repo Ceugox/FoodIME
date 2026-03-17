@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p ${PORT:-3001}",
+    "start": "cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public && PORT=${PORT:-3001} HOSTNAME=0.0.0.0 node .next/standalone/server.js",
     "lint": "next lint"
   },
   "dependencies": {
