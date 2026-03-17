@@ -8,8 +8,6 @@ import helmet from 'helmet';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
-  app.use(helmet());
-
   app.enableCors({
     origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3001', 'http://localhost:3002'],
     credentials: true,
@@ -17,6 +15,11 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'x-signature', 'x-request-id'],
     maxAge: 3600,
   });
+
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: false,
+  }));
 
   app.useGlobalFilters(new PrismaExceptionFilter());
 
