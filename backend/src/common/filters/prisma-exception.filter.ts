@@ -36,6 +36,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         });
 
       default:
+        console.error(`[PrismaExceptionFilter] Unhandled code=${exception.code} message=${exception.message}`);
         return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'Erro interno no banco de dados',

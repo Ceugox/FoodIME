@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MercadoPagoService } from './mercadopago.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
@@ -6,6 +12,8 @@ import type { UserPayload } from '../../common/decorators/current-user.decorator
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly mercadopago: MercadoPagoService,
@@ -30,6 +38,9 @@ export class PaymentsService {
     if (order.status !== 'PENDING') {
       throw new BadRequestException('Pedido não está pendente');
     }
+
+    // 2.10 Duplicate payment prevention
+    await this.checkDuplicatePayment(orderId);
 
     const amountInCents = Math.round(Number(order.totalAmount) * 100);
     const commissionPercent = Number(order.store.commissionRate) * 100;
@@ -59,11 +70,12 @@ export class PaymentsService {
       });
       gatewayTxId = result.id;
 
-      // Card payments may be approved immediately (e.g. test card APRO)
+      // 2.3 Card payments may be approved immediately (e.g. test card APRO)
       if (result.status === 'approved') {
         const commissionVal = (Number(order.totalAmount) * commissionPercent) / 100;
         const netVal = Number(order.totalAmount) - commissionVal;
 
+        // Create payment record, then confirm order atomically
         try {
           await this.prisma.payment.create({
             data: {
@@ -83,8 +95,37 @@ export class PaymentsService {
           throw error;
         }
 
-        // Confirm immediately since MP already approved
-        await this.confirmOrderWithStockDecrement(orderId);
+        // Confirm with atomic stock decrement; if stock fails, refund via MP
+        const stockOk = await this.confirmOrderWithStockDecrement(orderId);
+
+        if (!stockOk) {
+          // Stock failed — refund the card payment via MP API
+          try {
+            await this.mercadopago.refundPayment(gatewayTxId);
+          } catch (refundErr) {
+            this.logger.error(
+              `Failed to refund card payment ${gatewayTxId} after stock failure: ${refundErr.message}`,
+            );
+          }
+
+          await this.prisma.$transaction([
+            this.prisma.payment.update({
+              where: { orderId },
+              data: {
+                status: 'REFUNDED',
+                refundReason: 'Estoque insuficiente no momento da confirmação',
+              },
+            }),
+            this.prisma.order.update({
+              where: { id: orderId },
+              data: { status: 'CANCELLED' },
+            }),
+          ]);
+
+          throw new BadRequestException(
+            'Estoque insuficiente. Pagamento estornado automaticamente.',
+          );
+        }
 
         return {
           data: { gatewayTxId, method },
@@ -137,7 +178,32 @@ export class PaymentsService {
     });
     if (!payment) return;
 
-    await this.confirmOrderWithStockDecrement(payment.orderId);
+    const stockOk = await this.confirmOrderWithStockDecrement(payment.orderId);
+
+    if (!stockOk) {
+      // Stock insufficient after webhook confirmation — refund via MP API
+      try {
+        await this.mercadopago.refundPayment(payment.gatewayTxId);
+      } catch (refundErr) {
+        this.logger.error(
+          `Failed to refund payment ${payment.gatewayTxId} after stock failure: ${refundErr.message}`,
+        );
+      }
+
+      await this.prisma.$transaction([
+        this.prisma.payment.update({
+          where: { orderId: payment.orderId },
+          data: {
+            status: 'REFUNDED',
+            refundReason: 'Estoque insuficiente no momento da confirmação',
+          },
+        }),
+        this.prisma.order.update({
+          where: { id: payment.orderId },
+          data: { status: 'CANCELLED' },
+        }),
+      ]);
+    }
   }
 
   async handlePaymentFailed(gatewayTxId: string) {
@@ -158,65 +224,108 @@ export class PaymentsService {
     ]);
   }
 
-  private async confirmOrderWithStockDecrement(orderId: string) {
-    const order = await this.prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
-      include: {
-        items: { include: { product: true } },
-        store: { select: { id: true, ownerId: true, name: true } },
-        buyer: { select: { name: true } },
+  /**
+   * 2.1 Atomic stock decrement with Serializable isolation.
+   * Returns true if order was confirmed, false if stock was insufficient.
+   */
+  private async confirmOrderWithStockDecrement(orderId: string): Promise<boolean> {
+    let stockFailed = false;
+
+    try {
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+          // Re-read the order inside the serializable transaction
+          const order = await tx.order.findUniqueOrThrow({
+            where: { id: orderId },
+            include: {
+              items: { include: { product: true } },
+              store: { select: { id: true, ownerId: true, name: true } },
+              buyer: { select: { name: true } },
+            },
+          });
+
+          // Idempotency guard: already confirmed
+          if (order.status === 'PAID') {
+            return { alreadyPaid: true, order };
+          }
+
+          // Atomically decrement stock using updateMany with WHERE stockQty >= quantity
+          for (const item of order.items) {
+            const updated = await tx.product.updateMany({
+              where: {
+                id: item.productId,
+                stockQty: { gte: item.quantity },
+              },
+              data: {
+                stockQty: { decrement: item.quantity },
+              },
+            });
+
+            if (updated.count === 0) {
+              // Stock insufficient — mark and throw to roll back the transaction
+              stockFailed = true;
+              throw new Error('STOCK_INSUFFICIENT');
+            }
+          }
+
+          // Update payment and order status to PAID within the same transaction
+          await tx.payment.update({
+            where: { orderId },
+            data: { status: 'PAID' },
+          });
+
+          await tx.order.update({
+            where: { id: orderId },
+            data: { status: 'PAID' },
+          });
+
+          return { alreadyPaid: false, order };
+        },
+        {
+          isolationLevel: 'Serializable',
+        },
+      );
+
+      // If already paid (idempotency), just return true
+      if (result.alreadyPaid) {
+        return true;
+      }
+
+      // Notify seller via Socket.io (outside the transaction)
+      this.notifications.notifyNewOrder(result.order.store.ownerId, {
+        id: result.order.id,
+        code: (result.order as any).code,
+        buyerName: result.order.buyer.name,
+        totalAmount: Number(result.order.totalAmount),
+        itemCount: result.order.items.length,
+      });
+
+      return true;
+    } catch (error) {
+      if (stockFailed) {
+        this.logger.warn(`Stock insufficient for order ${orderId}, rolling back`);
+        return false;
+      }
+      // Re-throw unexpected errors
+      throw error;
+    }
+  }
+
+  /**
+   * 2.10 Duplicate payment prevention.
+   * Throws ConflictException if a non-FAILED payment already exists for this order.
+   */
+  private async checkDuplicatePayment(orderId: string): Promise<void> {
+    const existing = await this.prisma.payment.findFirst({
+      where: {
+        orderId,
+        status: { not: 'FAILED' },
       },
     });
 
-    // Verificar estoque antes de confirmar
-    for (const item of order.items) {
-      if (item.product.stockQty < item.quantity) {
-        // Estoque insuficiente — estornar e cancelar
-        const payment = await this.prisma.payment.findUniqueOrThrow({
-          where: { orderId },
-        });
-        await this.mercadopago.refundPayment(payment.gatewayTxId);
-
-        await this.prisma.$transaction([
-          this.prisma.payment.update({
-            where: { orderId },
-            data: { status: 'REFUNDED' },
-          }),
-          this.prisma.order.update({
-            where: { id: orderId },
-            data: { status: 'CANCELLED' },
-          }),
-        ]);
-        return;
-      }
+    if (existing) {
+      throw new ConflictException('Já existe um pagamento ativo para este pedido');
     }
-
-    // Decrementar estoque atomicamente e confirmar pedido
-    await this.prisma.$transaction([
-      ...order.items.map((item) =>
-        this.prisma.product.update({
-          where: { id: item.productId },
-          data: { stockQty: { decrement: item.quantity } },
-        }),
-      ),
-      this.prisma.payment.update({
-        where: { orderId },
-        data: { status: 'PAID' },
-      }),
-      this.prisma.order.update({
-        where: { id: orderId },
-        data: { status: 'PAID' },
-      }),
-    ]);
-
-    // Notificar vendedor via Socket.io
-    this.notifications.notifyNewOrder(order.store.ownerId, {
-      id: order.id,
-      code: (order as any).code,
-      buyerName: order.buyer.name,
-      totalAmount: Number(order.totalAmount),
-      itemCount: order.items.length,
-    });
   }
 
   private getCardRejectionMessage(statusDetail?: string): string {

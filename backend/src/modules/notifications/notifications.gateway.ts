@@ -7,7 +7,7 @@ import {
   MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 
@@ -17,7 +17,7 @@ import { Server, Socket } from 'socket.io';
   namespace: '/notifications',
 })
 export class NotificationsGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   @WebSocketServer()
   server: Server;
@@ -25,6 +25,11 @@ export class NotificationsGateway
   private readonly logger = new Logger(NotificationsGateway.name);
 
   constructor(private readonly jwtService: JwtService) {}
+
+  onModuleDestroy() {
+    this.server?.disconnectSockets();
+    this.logger.log('Socket.io server disconnected all sockets');
+  }
 
   handleConnection(client: Socket) {
     const token = client.handshake.auth?.token as string | undefined;
@@ -51,7 +56,14 @@ export class NotificationsGateway
     @MessageBody() data: { sellerId: string },
   ) {
     const user = (client as any).user;
-    if (!user || user.id !== data.sellerId) {
+    if (!user) return { error: 'Não autenticado' };
+    try {
+      this.jwtService.verify(client.handshake.auth?.token);
+    } catch {
+      client.disconnect();
+      return { error: 'Token expirado' };
+    }
+    if (user.id !== data.sellerId) {
       return { error: 'Acesso negado' };
     }
     const room = `seller-${data.sellerId}`;
@@ -64,6 +76,14 @@ export class NotificationsGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { sellerId: string },
   ) {
+    const user = (client as any).user;
+    if (!user) return { error: 'Não autenticado' };
+    try {
+      this.jwtService.verify(client.handshake.auth?.token);
+    } catch {
+      client.disconnect();
+      return { error: 'Token expirado' };
+    }
     const room = `seller-${data.sellerId}`;
     client.leave(room);
   }

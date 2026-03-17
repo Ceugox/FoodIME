@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useCartStore } from '@/store/cartStore';
 import { useCreateOrder } from '@/hooks/useOrders';
 import { formatCurrency } from '@/lib/utils';
+import { toast } from '@/hooks/useToast';
 
 export default function CartPage() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function CartPage() {
       });
       router.push(`/checkout/${order.id}`);
     } catch (err: any) {
-      alert(err?.response?.data?.message || 'Erro ao criar pedido');
+      toast({ title: err?.response?.data?.message || 'Erro ao criar pedido', variant: 'error' });
     }
   }
 

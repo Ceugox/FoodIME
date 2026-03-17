@@ -4,6 +4,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useState } from 'react';
 import { Toaster } from '@/components/ui/toaster';
 import { OfflineBanner } from '@/components/common/OfflineBanner';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
 
@@ -20,21 +21,23 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }),
   );
 
-  const content = (
-    <QueryClientProvider client={queryClient}>
-      {children}
-      <Toaster />
-      <OfflineBanner />
-    </QueryClientProvider>
+  return (
+    <ErrorBoundary>
+      {GOOGLE_CLIENT_ID ? (
+        <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+          <QueryClientProvider client={queryClient}>
+            {children}
+            <Toaster />
+            <OfflineBanner />
+          </QueryClientProvider>
+        </GoogleOAuthProvider>
+      ) : (
+        <QueryClientProvider client={queryClient}>
+          {children}
+          <Toaster />
+          <OfflineBanner />
+        </QueryClientProvider>
+      )}
+    </ErrorBoundary>
   );
-
-  if (GOOGLE_CLIENT_ID) {
-    return (
-      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-        {content}
-      </GoogleOAuthProvider>
-    );
-  }
-
-  return content;
 }

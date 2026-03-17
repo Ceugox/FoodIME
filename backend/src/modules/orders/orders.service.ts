@@ -7,6 +7,14 @@ import type { UserPayload } from '../../common/decorators/current-user.decorator
 
 const PENDING_EXPIRY_MS = 20 * 60 * 1000; // 20 minutos
 
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  PENDING: ['PAID', 'CANCELLED'],
+  PAID: ['READY', 'CANCELLED'],
+  READY: ['PICKED_UP'],
+  PICKED_UP: [],
+  CANCELLED: [],
+};
+
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
@@ -79,26 +87,34 @@ export class OrdersService {
       };
     });
 
-    // Gerar código único de 6 caracteres
-    const code = this.generateOrderCode();
-
-    const order = await this.prisma.order.create({
-      data: {
-        buyerId: user.id,
-        storeId: dto.storeId,
-        totalAmount,
-        code,
-        items: {
-          create: orderItems,
-        },
-      },
-      include: {
-        items: {
-          include: { product: { select: { name: true, imageUrl: true } } },
-        },
-        store: { select: { id: true, name: true } },
-      },
-    });
+    // Gerar código único de 6 caracteres (retry em caso de colisão P2002)
+    let order;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const code = this.generateOrderCode();
+        order = await this.prisma.order.create({
+          data: {
+            buyerId: user.id,
+            storeId: dto.storeId,
+            totalAmount,
+            code,
+            items: {
+              create: orderItems,
+            },
+          },
+          include: {
+            items: {
+              include: { product: { select: { name: true, imageUrl: true } } },
+            },
+            store: { select: { id: true, name: true } },
+          },
+        });
+        break;
+      } catch (error: any) {
+        if (error.code === 'P2002' && attempt < 4) continue;
+        throw error;
+      }
+    }
 
     return { data: order };
   }
@@ -190,6 +206,13 @@ export class OrdersService {
       throw new ForbiddenException('Apenas o vendedor pode atualizar o status');
     }
 
+    const allowed = VALID_TRANSITIONS[order.status] || [];
+    if (!allowed.includes(status)) {
+      throw new BadRequestException(
+        `Transição de ${order.status} para ${status} não é permitida`,
+      );
+    }
+
     const updated = await this.prisma.order.update({
       where: { id },
       data: { status: status as any },
@@ -231,30 +254,16 @@ export class OrdersService {
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Pedidos pagos por período
-    const [todayOrders, weekOrders, monthOrders] = await Promise.all([
-      this.prisma.order.findMany({
-        where: {
-          storeId: store.id,
-          status: { in: ['PAID', 'READY', 'PICKED_UP'] },
-          createdAt: { gte: startOfDay },
-        },
-      }),
-      this.prisma.order.findMany({
-        where: {
-          storeId: store.id,
-          status: { in: ['PAID', 'READY', 'PICKED_UP'] },
-          createdAt: { gte: startOfWeek },
-        },
-      }),
-      this.prisma.order.findMany({
-        where: {
-          storeId: store.id,
-          status: { in: ['PAID', 'READY', 'PICKED_UP'] },
-          createdAt: { gte: startOfMonth },
-        },
-      }),
-    ]);
+    // Single query for the month, filter today/week in memory (N+1 fix)
+    const monthOrders = await this.prisma.order.findMany({
+      where: {
+        storeId: store.id,
+        status: { in: ['PAID', 'READY', 'PICKED_UP'] },
+        createdAt: { gte: startOfMonth },
+      },
+    });
+    const weekOrders = monthOrders.filter((o) => o.createdAt >= startOfWeek);
+    const todayOrders = monthOrders.filter((o) => o.createdAt >= startOfDay);
 
     const sumRevenue = (orders: typeof todayOrders) =>
       orders.reduce((sum, o) => sum + Number(o.totalAmount), 0);

@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Headers, Query, HttpCode, Logger } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { LRUCache } from 'lru-cache';
 import * as crypto from 'crypto';
 import { PaymentsService } from './payments.service';
 import { MercadoPagoService } from './mercadopago.service';
@@ -9,7 +10,7 @@ const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300; // 5 minutos
 @Controller('payments')
 export class WebhookController {
   private readonly logger = new Logger(WebhookController.name);
-  private readonly processedRequestIds = new Set<string>();
+  private readonly processedRequestIds = new LRUCache<string, true>({ max: 10000, ttl: 600000 });
 
   constructor(
     private readonly paymentsService: PaymentsService,
@@ -26,7 +27,7 @@ export class WebhookController {
     @Body() body: any,
   ) {
     // Deduplicação por request-id
-    if (requestId && this.processedRequestIds.has(requestId)) {
+    if (requestId && this.processedRequestIds.get(requestId)) {
       this.logger.warn(`Webhook duplicado ignorado: ${requestId}`);
       return { received: true };
     }
@@ -65,13 +66,9 @@ export class WebhookController {
       }
     }
 
-    // Marcar request-id como processado (TTL de 10 min)
+    // Marcar request-id como processado (LRU cache com TTL de 10 min)
     if (requestId) {
-      this.processedRequestIds.add(requestId);
-      setTimeout(
-        () => this.processedRequestIds.delete(requestId),
-        10 * 60 * 1000,
-      );
+      this.processedRequestIds.set(requestId, true);
     }
 
     const action = body.action;

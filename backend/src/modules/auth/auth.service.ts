@@ -234,7 +234,7 @@ export class AuthService {
         data: {
           email,
           name: name || email.split('@')[0],
-          phone: '',
+          phone: null,
           googleId,
           role,
           status,

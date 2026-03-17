@@ -21,3 +21,6 @@ export function formatDate(dateStr: string): string {
     minute: '2-digit',
   }).format(new Date(dateStr));
 }
+
+export const inputClass =
+  'w-full h-12 bg-surface-2 border border-border rounded-xl px-4 text-text placeholder:text-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none text-sm transition-all';

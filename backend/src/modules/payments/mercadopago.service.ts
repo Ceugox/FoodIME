@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import axios from 'axios';
 
 interface PixPaymentParams {
@@ -51,10 +51,14 @@ export class MercadoPagoService {
       });
       return response.data;
     } catch (error: any) {
-      const msg =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        error.message;
+      const status = error.response?.status;
+      const msg = error.response?.data?.message || error.response?.data?.error || error.message;
+      if (status === 400 || status === 422) {
+        throw new BadRequestException(`MercadoPago: ${msg}`);
+      }
+      if (status === 404) {
+        throw new NotFoundException(`MercadoPago: ${msg}`);
+      }
       throw new InternalServerErrorException(`MercadoPago error: ${msg}`);
     }
   }

@@ -1,5 +1,5 @@
 'use client';
-import { use, useState, useEffect } from 'react';
+import { use, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { useOrder } from '@/hooks/useOrders';
@@ -47,13 +47,27 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
   const initiate = useInitiatePayment();
   const [pollPayment, setPollPayment] = useState(false);
   const { data: payment } = usePaymentByOrder(orderId, pollPayment);
+  const redirectedRef = useRef(false);
+
+  // Auto-detect existing payment on mount (recovers from aborted requests)
+  useEffect(() => {
+    if (order?.status === 'PENDING') {
+      // Check once for existing payment
+      import('@/services/payment.service').then(({ paymentService }) =>
+        paymentService.getByOrder(orderId).then(() => setPollPayment(true)).catch(() => {}),
+      );
+    } else if (order?.status === 'PAID') {
+      setPollPayment(true);
+    }
+  }, [order?.status, orderId]);
 
   // Redirect when paid
   useEffect(() => {
     if (payment?.status === 'PAID') setPollPayment(false);
-    if (payment?.status === 'PAID' || order?.status === 'PAID') {
+    if ((payment?.status === 'PAID' || order?.status === 'PAID') && !redirectedRef.current) {
+      redirectedRef.current = true;
       clearCart();
-      router.replace(`/orders`);
+      router.replace('/orders');
     }
     if (payment?.status === 'FAILED') {
       setPollPayment(false);
@@ -67,7 +81,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ orderId: st
       setPixData({ qrCode: result.pixQrCode!, base64: result.pixQrCodeBase64, startedAt: Date.now() });
       setPollPayment(true);
     } catch (err: any) {
-      toast({ title: err?.response?.data?.message || 'Erro ao gerar PIX', variant: 'error' });
+      if (err?.response?.status === 409) {
+        toast({ title: 'Pagamento PIX já gerado. Aguardando confirmação...', variant: 'default' });
+        setPollPayment(true);
+      } else {
+        toast({ title: err?.response?.data?.message || 'Erro ao gerar PIX', variant: 'error' });
+      }
     }
   }
 

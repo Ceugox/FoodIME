@@ -47,7 +47,7 @@ function StoreCard({ store, index }: { store: Store; index: number }) {
       >
         {store.imageUrl ? (
           <div className="relative w-[88px] h-[88px] min-w-[88px] flex-shrink-0">
-            <Image src={store.imageUrl} alt={store.name} fill className="object-cover" />
+            <Image src={store.imageUrl} alt={store.name} fill className="object-cover" priority={index < 3} />
           </div>
         ) : (
           <div className="w-[88px] h-[88px] min-w-[88px] flex-shrink-0 bg-primary-dark flex items-center justify-center">

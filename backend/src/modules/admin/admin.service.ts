@@ -9,8 +9,8 @@ export class AdminService {
     private readonly emailService: EmailService,
   ) {}
 
-  async getUsers(role?: string, search?: string, status?: string) {
-    const where: any = {};
+  async getUsers(role?: string, search?: string, status?: string, page = 1, limit = 20) {
+    const where: any = { deletedAt: null };
     if (role) where.role = role;
     if (status) where.status = status;
     if (search) {
@@ -20,23 +20,28 @@ export class AdminService {
       ];
     }
 
-    const users = await this.prisma.user.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
-        status: true,
-        emailVerified: true,
-        createdAt: true,
-        _count: { select: { orders: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          status: true,
+          emailVerified: true,
+          createdAt: true,
+          _count: { select: { orders: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
 
-    return { data: users };
+    return { data: users, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
   async updateUserStatus(id: string, status: 'ACTIVE' | 'BLOCKED', reason?: string) {
@@ -50,6 +55,14 @@ export class AdminService {
       data: { status },
       select: { id: true, name: true, email: true, role: true, status: true },
     });
+
+    // Close store when blocking a seller
+    if (status === 'BLOCKED' && user.store) {
+      await this.prisma.store.update({
+        where: { id: user.store.id },
+        data: { isOpen: false },
+      });
+    }
 
     if (status === 'ACTIVE' && user.role === 'SELLER') {
       const storeName = user.store?.name || 'sua loja';
@@ -89,7 +102,24 @@ export class AdminService {
   }
 
   async deleteUser(id: string) {
-    await this.prisma.user.delete({ where: { id } });
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id },
+      include: { store: true },
+    });
+
+    // Soft delete: set deletedAt + block + invalidate tokens
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id },
+        data: { deletedAt: new Date(), status: 'BLOCKED' },
+      }),
+      this.prisma.refreshToken.deleteMany({ where: { userId: id } }),
+      // If seller, close their store
+      ...(user.store
+        ? [this.prisma.store.update({ where: { id: user.store.id }, data: { isOpen: false } })]
+        : []),
+    ]);
+
     return { message: 'Usuário removido com sucesso' };
   }
 
@@ -176,6 +206,17 @@ export class AdminService {
     return { data: { user, orders, totalSpent, totalOrders: orders.length } };
   }
 
+  async getStores() {
+    const stores = await this.prisma.store.findMany({
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return { data: stores };
+  }
+
   async updateStoreCommission(storeId: string, rate: number) {
     if (rate < 0 || rate > 0.30) {
       throw new BadRequestException('Taxa deve estar entre 0 e 0.30 (0% a 30%)');
@@ -190,31 +231,34 @@ export class AdminService {
     return { data: store };
   }
 
-  async getTransactions(method?: string, status?: string) {
+  async getTransactions(method?: string, status?: string, page = 1, limit = 50) {
     const where: any = {};
     if (method) where.method = method;
     if (status) where.status = status;
 
-    const payments = await this.prisma.payment.findMany({
-      where,
-      include: {
-        order: {
-          select: {
-            code: true,
-            buyer: { select: { name: true } },
-            store: { select: { name: true } },
+    const [payments, total, totals] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        include: {
+          order: {
+            select: {
+              code: true,
+              buyer: { select: { name: true } },
+              store: { select: { name: true } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
-
-    const totals = await this.prisma.payment.aggregate({
-      where: { ...where, status: 'PAID' },
-      _sum: { grossAmount: true, commission: true, netAmount: true },
-      _count: true,
-    });
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.payment.count({ where }),
+      this.prisma.payment.aggregate({
+        where: { ...where, status: 'PAID' },
+        _sum: { grossAmount: true, commission: true, netAmount: true },
+        _count: true,
+      }),
+    ]);
 
     return {
       data: {
@@ -237,42 +281,46 @@ export class AdminService {
           net: Number(totals._sum.netAmount || 0),
         },
       },
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
   async getPayoutOverview() {
-    const stores = await this.prisma.store.findMany({
-      include: { owner: { select: { name: true } } },
-    });
+    // Optimized: single raw query instead of N+1 loop
+    const result = await this.prisma.$queryRaw<
+      Array<{
+        storeId: string;
+        storeName: string;
+        sellerName: string;
+        totalEarned: number;
+        totalPaid: number;
+      }>
+    >`
+      SELECT
+        s."id" AS "storeId",
+        s."name" AS "storeName",
+        u."name" AS "sellerName",
+        COALESCE((
+          SELECT SUM(p."netAmount")
+          FROM "Payment" p
+          JOIN "Order" o ON o."id" = p."orderId"
+          WHERE o."storeId" = s."id" AND p."status" = 'PAID'
+        ), 0)::float AS "totalEarned",
+        COALESCE((
+          SELECT SUM(po."amount")
+          FROM "Payout" po
+          WHERE po."storeId" = s."id"
+        ), 0)::float AS "totalPaid"
+      FROM "Store" s
+      JOIN "User" u ON u."id" = s."ownerId"
+    `;
 
-    const result = await Promise.all(
-      stores.map(async (store) => {
-        const [earned, paid] = await Promise.all([
-          this.prisma.payment.aggregate({
-            where: { order: { storeId: store.id }, status: 'PAID' },
-            _sum: { netAmount: true },
-          }),
-          this.prisma.payout.aggregate({
-            where: { storeId: store.id },
-            _sum: { amount: true },
-          }),
-        ]);
-
-        const totalEarned = Number(earned._sum.netAmount || 0);
-        const totalPaid = Number(paid._sum.amount || 0);
-
-        return {
-          storeId: store.id,
-          storeName: store.name,
-          sellerName: store.owner.name,
-          totalEarned,
-          totalPaid,
-          balance: totalEarned - totalPaid,
-        };
-      }),
-    );
-
-    return { data: result };
+    return {
+      data: result.map((r) => ({
+        ...r,
+        balance: r.totalEarned - r.totalPaid,
+      })),
+    };
   }
 
   async createPayout(storeId: string, amount: number, note?: string) {
@@ -299,24 +347,11 @@ export class AdminService {
   }
 
   async getDashboardOverview() {
-    // Limpar pedidos PENDING expirados (>20min) antes de contar
-    const cutoff = new Date(Date.now() - 20 * 60 * 1000);
-    const expired = await this.prisma.order.findMany({
-      where: { status: 'PENDING', createdAt: { lt: cutoff } },
-      select: { id: true },
-    });
-    if (expired.length > 0) {
-      const ids = expired.map((o) => o.id);
-      await this.prisma.$transaction([
-        this.prisma.payment.deleteMany({ where: { orderId: { in: ids } } }),
-        this.prisma.orderItem.deleteMany({ where: { orderId: { in: ids } } }),
-        this.prisma.order.deleteMany({ where: { id: { in: ids } } }),
-      ]);
-    }
-
+    // Expired order cleanup moved to OrdersCron (EVERY_5_MINUTES)
     const [userCounts, orderCounts, paymentTotals] = await Promise.all([
       this.prisma.user.groupBy({
         by: ['role'],
+        where: { deletedAt: null },
         _count: true,
       }),
       this.prisma.order.groupBy({

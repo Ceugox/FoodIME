@@ -42,6 +42,9 @@ const config: Config = {
         '2xl': '1rem',
         '3xl': '1.5rem',
       },
+      padding: {
+        safe: 'env(safe-area-inset-bottom)',
+      },
       boxShadow: {
         'warm-sm': '0 1px 3px rgba(42,31,22,0.4)',
         warm: '0 4px 12px rgba(42,31,22,0.5)',

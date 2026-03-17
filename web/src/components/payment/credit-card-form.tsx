@@ -29,6 +29,21 @@ function maskExpiry(value: string): string {
   return digits;
 }
 
+function luhnCheck(num: string): boolean {
+  let sum = 0;
+  let alt = false;
+  for (let i = num.length - 1; i >= 0; i--) {
+    let n = parseInt(num[i], 10);
+    if (alt) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+
 function maskCpf(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11);
   if (digits.length <= 3) return digits;
@@ -54,6 +69,8 @@ export function CreditCardForm({ onSubmit, loading }: CreditCardFormProps) {
     const digits = cardNumber.replace(/\D/g, '');
 
     if (digits.length < 13 || digits.length > 16) {
+      newErrors.cardNumber = 'Numero do cartao invalido';
+    } else if (!luhnCheck(digits)) {
       newErrors.cardNumber = 'Numero do cartao invalido';
     }
     if (cardholderName.trim().length < 3) {

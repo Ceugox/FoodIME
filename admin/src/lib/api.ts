@@ -20,6 +20,7 @@ export async function apiFetch<T>(
 
   if (res.status === 401 && typeof window !== 'undefined') {
     localStorage.removeItem('admin_token');
+    document.cookie = 'admin_token=; path=/; max-age=0';
     window.location.href = '/login';
     throw new Error('Unauthorized');
   }

@@ -28,6 +28,8 @@ export const useCartStore = create<CartState>()(
       items: [],
 
       addItem: (product, storeName) => {
+        if (!product.isAvailable || product.stockQty <= 0) return;
+
         const { items, storeId } = get();
 
         if (storeId && storeId !== product.storeId) {
@@ -61,6 +63,8 @@ export const useCartStore = create<CartState>()(
           get().removeItem(productId);
           return;
         }
+        const item = get().items.find((i) => i.product.id === productId);
+        if (item && quantity > item.product.stockQty) quantity = item.product.stockQty;
         set({ items: get().items.map((i) => (i.product.id === productId ? { ...i, quantity } : i)) });
       },
 

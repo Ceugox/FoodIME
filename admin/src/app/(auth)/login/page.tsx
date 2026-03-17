@@ -35,6 +35,7 @@ export default function LoginPage() {
       }
 
       localStorage.setItem('admin_token', data.data.accessToken);
+      document.cookie = `admin_token=${data.data.accessToken}; path=/; max-age=604800; SameSite=Lax`;
       router.replace('/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao fazer login');

@@ -22,12 +22,14 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/cart') || pathname.startsWith('/checkout') ||
     pathname.startsWith('/orders') || pathname.startsWith('/profile');
   const isSellerRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/seller');
+  const isAdminRoute = pathname.startsWith('/admin');
 
   // Redirect authenticated users away from auth pages
   if (isAuthRoute && token) {
     const role = await getRole(token);
     if (role === 'BUYER') return NextResponse.redirect(new URL('/home', request.url));
     if (role === 'SELLER') return NextResponse.redirect(new URL('/dashboard', request.url));
+    if (role === 'ADMIN') return NextResponse.redirect(new URL('/admin/dashboard', request.url));
   }
 
   // Protect buyer routes
@@ -46,6 +48,14 @@ export async function middleware(request: NextRequest) {
     if (role !== 'SELLER') return NextResponse.redirect(new URL('/login', request.url));
   }
 
+  // Protect admin routes
+  if (isAdminRoute) {
+    if (!token) return NextResponse.redirect(new URL('/login', request.url));
+    const role = await getRole(token);
+    if (!role) return NextResponse.redirect(new URL('/login', request.url));
+    if (role !== 'ADMIN') return NextResponse.redirect(new URL('/login', request.url));
+  }
+
   return NextResponse.next();
 }
 
@@ -59,6 +69,7 @@ export const config = {
     '/profile/:path*',
     '/dashboard/:path*',
     '/seller/:path*',
+    '/admin/:path*',
     '/login',
     '/register',
   ],

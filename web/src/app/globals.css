@@ -65,3 +65,13 @@ body::before {
 .animate-stagger > .stagger-6 { animation-delay: 360ms; }
 .animate-stagger > .stagger-7 { animation-delay: 420ms; }
 .animate-stagger > .stagger-8 { animation-delay: 480ms; }
+
+/* Autofill dark theme fix */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px #2E2620 inset !important;
+  -webkit-text-fill-color: #F5EDE4 !important;
+  caret-color: #F5EDE4;
+  transition: background-color 5000s ease-in-out 0s;
+}

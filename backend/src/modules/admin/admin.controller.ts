@@ -32,8 +32,10 @@ export class AdminController {
     @Query('role') role?: string,
     @Query('search') search?: string,
     @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.adminService.getUsers(role, search, status);
+    return this.adminService.getUsers(role, search, status, page ? +page : 1, limit ? +limit : 20);
   }
 
   @Get('users/:id')
@@ -80,12 +82,19 @@ export class AdminController {
     return this.adminService.updateStoreCommission(id, data.commissionRate);
   }
 
+  @Get('stores')
+  getStores() {
+    return this.adminService.getStores();
+  }
+
   @Get('transactions')
   getTransactions(
     @Query('method') method?: string,
     @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.adminService.getTransactions(method, status);
+    return this.adminService.getTransactions(method, status, page ? +page : 1, limit ? +limit : 50);
   }
 
   @Get('payouts')

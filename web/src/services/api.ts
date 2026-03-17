@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
-  timeout: 10_000,
+  timeout: 30_000,
 });
 
 api.interceptors.request.use((config) => {
@@ -54,6 +54,14 @@ api.interceptors.response.use(
         if (typeof window !== 'undefined') window.location.href = '/login';
         return Promise.reject(error);
       }
+    }
+
+    // Handle network errors
+    if (!error.response) {
+      const msg = error.code === 'ECONNABORTED'
+        ? 'Tempo de conexão esgotado. Verifique sua internet.'
+        : 'Erro de conexão. Verifique sua internet.';
+      return Promise.reject({ ...error, message: msg });
     }
 
     return Promise.reject(error);

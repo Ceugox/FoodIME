@@ -8,6 +8,8 @@ const links = [
   { href: '/users', label: 'Usuários' },
   { href: '/transactions', label: 'Transações' },
   { href: '/payouts', label: 'Repasses' },
+  { href: '/coupons', label: 'Cupons' },
+  { href: '/stores', label: 'Lojas' },
 ];
 
 export function Sidebar() {
@@ -39,8 +41,18 @@ export function Sidebar() {
       </nav>
       <div className="mt-auto px-5">
         <button
-          onClick={() => {
+          onClick={async () => {
+            try {
+              const token = localStorage.getItem('admin_token');
+              if (token) {
+                await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/logout`, {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+              }
+            } catch {}
             localStorage.removeItem('admin_token');
+            document.cookie = 'admin_token=; path=/; max-age=0';
             window.location.href = '/login';
           }}
           className="w-full py-2 bg-white/10 text-slate-400 rounded-lg text-[13px] hover:bg-white/15 transition-colors"

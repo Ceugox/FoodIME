@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsNotEmpty, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsInt, IsNotEmpty, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class OrderItemDto {
@@ -8,6 +8,7 @@ class OrderItemDto {
 
   @IsInt()
   @Min(1)
+  @Max(100)
   quantity: number;
 }
 

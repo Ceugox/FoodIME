@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
@@ -17,6 +17,11 @@ import { AdminModule } from './modules/admin/admin.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { EmailModule } from './modules/email/email.module';
+import { HealthModule } from './modules/health/health.module';
+import { CouponsModule } from './modules/coupons/coupons.module';
+import { AuditModule } from './modules/audit/audit.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 
 @Module({
   imports: [
@@ -29,7 +34,9 @@ import { EmailModule } from './modules/email/email.module';
         JWT_REFRESH_SECRET: Joi.string().required().min(32),
         MERCADOPAGO_ACCESS_TOKEN: Joi.string().required(),
         MERCADOPAGO_WEBHOOK_SECRET: Joi.string().required(),
-        RESEND_API_KEY: Joi.string().optional(),
+        GMAIL_USER: Joi.string().optional(),
+        GMAIL_APP_PASSWORD: Joi.string().optional(),
+        DIRECT_URL: Joi.string().optional(),
         FRONTEND_URL: Joi.string().default('http://localhost:3001'),
         GOOGLE_CLIENT_ID: Joi.string().optional(),
         CORS_ORIGINS: Joi.string().default('http://localhost:3001'),
@@ -56,6 +63,10 @@ import { EmailModule } from './modules/email/email.module';
     NotificationsModule,
     AdminModule,
     UploadsModule,
+    HealthModule,
+    CouponsModule,
+    AuditModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [
@@ -71,4 +82,8 @@ import { EmailModule } from './modules/email/email.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestLoggerMiddleware).forRoutes('*');
+  }
+}

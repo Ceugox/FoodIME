@@ -19,6 +19,9 @@ export class CreateStoreDto {
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|\d{11}|\d{14}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\+?\d{10,15})$/, {
+    message: 'Chave PIX deve ser email, CPF, CNPJ, UUID ou telefone',
+  })
   pixKey: string;
 
   @IsOptional()
