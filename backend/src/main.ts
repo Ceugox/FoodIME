@@ -8,15 +8,14 @@ import helmet from 'helmet';
 import express, { Request, Response, NextFunction } from 'express';
 
 function isOriginAllowed(origin: string): boolean {
-  // Railway subdomains (all owned by us)
-  if (origin.endsWith('.up.railway.app')) return true;
+  const normalizedOrigin = origin.replace(/\/+$/, '');
   // Localhost for development
-  if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
+  if (/^https?:\/\/localhost(:\d+)?$/.test(normalizedOrigin)) return true;
   // Explicit env var origins
   const extra = process.env.CORS_ORIGINS;
   if (extra) {
     const list = extra.split(',').map((o) => o.trim().replace(/\/+$/, ''));
-    if (list.includes(origin)) return true;
+    if (list.includes(normalizedOrigin)) return true;
   }
   return false;
 }

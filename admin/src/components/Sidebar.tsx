@@ -43,16 +43,8 @@ export function Sidebar() {
         <button
           onClick={async () => {
             try {
-              const token = localStorage.getItem('admin_token');
-              if (token) {
-                await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/logout`, {
-                  method: 'POST',
-                  headers: { Authorization: `Bearer ${token}` },
-                });
-              }
+              await fetch('/api/auth/logout', { method: 'POST' });
             } catch {}
-            localStorage.removeItem('admin_token');
-            document.cookie = 'admin_token=; path=/; max-age=0';
             window.location.href = '/login';
           }}
           className="w-full py-2 bg-white/10 text-slate-400 rounded-lg text-[13px] hover:bg-white/15 transition-colors"
