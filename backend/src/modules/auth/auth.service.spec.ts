@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -52,7 +52,9 @@ const mockJwt = {
 };
 
 const mockEmail = {
+  ensureConfigured: jest.fn(),
   sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+  sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
   sendSellerApprovedEmail: jest.fn().mockResolvedValue(undefined),
   sendSellerRejectedEmail: jest.fn().mockResolvedValue(undefined),
 };
@@ -77,6 +79,10 @@ describe('AuthService', () => {
 
     service = module.get<AuthService>(AuthService);
     jest.clearAllMocks();
+    mockEmail.ensureConfigured.mockReset();
+    mockEmail.ensureConfigured.mockImplementation(() => undefined);
+    mockEmail.sendPasswordResetEmail.mockReset();
+    mockEmail.sendPasswordResetEmail.mockResolvedValue(undefined);
     mockPrisma.refreshToken.create.mockResolvedValue({ id: 'rt-1', token: 'mock-token' });
   });
 
@@ -157,6 +163,32 @@ describe('AuthService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(service.login(dto)).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('fails fast when email delivery is unavailable', async () => {
+      mockEmail.ensureConfigured.mockImplementation(() => {
+        throw new ServiceUnavailableException('Servico de email indisponivel no momento. Tente novamente mais tarde.');
+      });
+
+      await expect(service.forgotPassword({ email: 'joao@test.com' })).rejects.toThrow(ServiceUnavailableException);
+      expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('stores a reset token and sends the reset email when configured', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
+      mockPrisma.user.update.mockResolvedValue({
+        ...mockUser,
+        passwordResetToken: 'mock-uuid-token',
+      });
+
+      const result = await service.forgotPassword({ email: 'joao@test.com' });
+
+      expect(mockEmail.ensureConfigured).toHaveBeenCalled();
+      expect(mockPrisma.user.update).toHaveBeenCalled();
+      expect(mockEmail.sendPasswordResetEmail).toHaveBeenCalledWith('joao@test.com', 'mock-uuid-token');
+      expect(result.message).toContain('Se o email estiver cadastrado');
     });
   });
 

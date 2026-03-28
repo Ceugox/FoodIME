@@ -21,14 +21,19 @@ export default function RegisterPage() {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
   }
 
+  function normalizePhone(value: string): string {
+    return value.replace(/\D/g, '');
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     try {
-      await register.mutateAsync(form);
+      await register.mutateAsync({ ...form, phone: normalizePhone(form.phone) });
       setSuccess(true);
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Erro ao criar conta');
+      const message = err?.response?.data?.message;
+      setError(Array.isArray(message) ? message[0] : message || 'Erro ao criar conta');
     }
   }
 
@@ -137,10 +142,12 @@ export default function RegisterPage() {
           <div>
             <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Telefone</label>
             <input className={inputClass} placeholder="(21) 99999-9999" value={form.phone} onChange={(e) => setForm({ ...form, phone: maskPhone(e.target.value) })} required />
+            <p className="mt-1 text-xs text-text-muted">Use DDD + número. Ex.: (21) 99999-9999</p>
           </div>
           <div>
             <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Senha</label>
             <input type="password" className={inputClass} placeholder="Mín. 8 caracteres" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={8} />
+            <p className="mt-1 text-xs text-text-muted">Use pelo menos 8 caracteres com maiúscula, minúscula e número.</p>
           </div>
 
           {error && (

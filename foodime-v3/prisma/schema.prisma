@@ -1,0 +1,204 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                      String         @id @default(uuid())
+  email                   String         @unique
+  password                String?
+  name                    String
+  phone                   String?
+  role                    Role           @default(BUYER)
+  status                  UserStatus     @default(PENDING)
+  emailVerified           Boolean        @default(false)
+  emailVerificationToken  String?        @unique
+  emailVerificationExpiry DateTime?
+  googleId                String?        @unique
+  passwordResetToken      String?        @unique
+  passwordResetExpiry     DateTime?
+  pushToken               String?
+  deletedAt               DateTime?
+  store                   Store?
+  orders                  Order[]
+  refreshTokens           RefreshToken[]
+  createdAt               DateTime       @default(now())
+
+  @@index([deletedAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model Store {
+  id             String    @id @default(uuid())
+  owner          User      @relation(fields: [ownerId], references: [id])
+  ownerId        String    @unique
+  name           String
+  description    String
+  imageUrl       String?
+  whatsapp       String
+  pixKey         String
+  commissionRate Decimal   @default(0.10)
+  isOpen         Boolean   @default(false)
+  openTime       String?
+  closeTime      String?
+  products       Product[]
+  orders         Order[]
+  payouts        Payout[]
+}
+
+model Product {
+  id          String      @id @default(uuid())
+  store       Store       @relation(fields: [storeId], references: [id])
+  storeId     String
+  name        String
+  imageUrl    String?
+  price       Decimal
+  stockQty    Int
+  isAvailable Boolean     @default(true)
+  deletedAt   DateTime?
+  orderItems  OrderItem[]
+
+  @@index([storeId])
+  @@index([isAvailable])
+  @@index([deletedAt])
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  buyer       User        @relation(fields: [buyerId], references: [id])
+  buyerId     String
+  store       Store       @relation(fields: [storeId], references: [id])
+  storeId     String
+  items       OrderItem[]
+  payment     Payment?
+  status      OrderStatus @default(PENDING)
+  code        String      @unique
+  totalAmount Decimal
+  createdAt   DateTime    @default(now())
+
+  @@index([buyerId])
+  @@index([storeId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([storeId, status, createdAt])
+}
+
+model OrderItem {
+  id              String  @id @default(uuid())
+  order           Order   @relation(fields: [orderId], references: [id])
+  orderId         String
+  product         Product @relation(fields: [productId], references: [id])
+  productId       String
+  quantity        Int
+  priceAtPurchase Decimal
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id           String        @id @default(uuid())
+  order        Order         @relation(fields: [orderId], references: [id])
+  orderId      String        @unique
+  method       PaymentMethod
+  gatewayTxId  String
+  grossAmount  Decimal
+  commission   Decimal
+  netAmount    Decimal
+  refundReason String?
+  status       PaymentStatus @default(PROCESSING)
+  createdAt    DateTime      @default(now())
+
+  @@index([gatewayTxId])
+  @@index([status])
+}
+
+model Coupon {
+  id         String     @id @default(uuid())
+  code       String     @unique
+  type       CouponType
+  discount   Decimal
+  isActive   Boolean    @default(true)
+  usageLimit Int?
+  usedCount  Int        @default(0)
+  expiresAt  DateTime?
+  createdAt  DateTime   @default(now())
+}
+
+model Payout {
+  id        String   @id @default(uuid())
+  store     Store    @relation(fields: [storeId], references: [id])
+  storeId   String
+  amount    Decimal
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([storeId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  action     String
+  targetType String
+  targetId   String
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([adminId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+enum Role {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  READY
+  PICKED_UP
+  CANCELLED
+}
+
+enum PaymentMethod {
+  PIX
+  CREDIT_CARD
+}
+
+enum PaymentStatus {
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED
+}

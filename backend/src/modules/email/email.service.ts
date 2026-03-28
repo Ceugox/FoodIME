@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
@@ -7,11 +7,13 @@ export class EmailService {
   private readonly transporter: nodemailer.Transporter | null;
   private readonly from: string;
   private readonly frontendUrl: string;
+  private readonly isProduction: boolean;
   private readonly logger = new Logger(EmailService.name);
 
   constructor(private readonly config: ConfigService) {
     const gmailUser = this.config.get<string>('GMAIL_USER');
     const gmailAppPassword = this.config.get<string>('GMAIL_APP_PASSWORD');
+    this.isProduction = this.config.get<string>('NODE_ENV') === 'production';
     this.from = this.config.get<string>('EMAIL_FROM', `FoodIME <${gmailUser || 'noreply@foodime.com'}>`);
     this.frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3001');
 
@@ -35,6 +37,12 @@ export class EmailService {
     }
   }
 
+  ensureConfigured() {
+    if (!this.transporter && this.isProduction) {
+      throw new ServiceUnavailableException('Servico de email indisponivel no momento. Tente novamente mais tarde.');
+    }
+  }
+
   private async sendMail(to: string, subject: string, html: string) {
     if (!this.transporter) {
       this.logger.log(`[DEV] Email to ${to}: ${subject}`);
@@ -48,6 +56,7 @@ export class EmailService {
     const link = `${this.frontendUrl}/verify-email?token=${token}`;
 
     try {
+      this.ensureConfigured();
       await this.sendMail(to, 'Verifique seu email — FoodIME', `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #6D7C3A;">FoodIME</h2>
@@ -65,11 +74,15 @@ export class EmailService {
       this.logger.log(`Verification email sent to ${to}`);
     } catch (error) {
       this.logger.error(`Failed to send verification email to ${to}`, error);
+      if (this.isProduction) {
+        throw new ServiceUnavailableException('Nao foi possivel enviar o email de verificacao no momento.');
+      }
     }
   }
 
   async sendSellerApprovedEmail(to: string, storeName: string) {
     try {
+      this.ensureConfigured();
       await this.sendMail(to, 'Sua conta foi aprovada! — FoodIME', `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #6D7C3A;">FoodIME</h2>
@@ -83,6 +96,9 @@ export class EmailService {
       this.logger.log(`Seller approved email sent to ${to}`);
     } catch (error) {
       this.logger.error(`Failed to send seller approved email to ${to}`, error);
+      if (this.isProduction) {
+        throw new ServiceUnavailableException('Nao foi possivel enviar o email de aprovacao no momento.');
+      }
     }
   }
 
@@ -90,6 +106,7 @@ export class EmailService {
     const link = `${this.frontendUrl}/reset-password?token=${token}`;
 
     try {
+      this.ensureConfigured();
       await this.sendMail(to, 'Redefinir senha — FoodIME', `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #6D7C3A;">FoodIME</h2>
@@ -107,11 +124,15 @@ export class EmailService {
       this.logger.log(`Password reset email sent to ${to}`);
     } catch (error) {
       this.logger.error(`Failed to send password reset email to ${to}`, error);
+      if (this.isProduction) {
+        throw new ServiceUnavailableException('Nao foi possivel enviar o email de redefinicao no momento.');
+      }
     }
   }
 
   async sendSellerRejectedEmail(to: string, reason?: string) {
     try {
+      this.ensureConfigured();
       await this.sendMail(to, 'Atualização sobre sua conta — FoodIME', `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #6D7C3A;">FoodIME</h2>
@@ -123,6 +144,9 @@ export class EmailService {
       this.logger.log(`Seller rejected email sent to ${to}`);
     } catch (error) {
       this.logger.error(`Failed to send seller rejected email to ${to}`, error);
+      if (this.isProduction) {
+        throw new ServiceUnavailableException('Nao foi possivel enviar o email no momento.');
+      }
     }
   }
 }

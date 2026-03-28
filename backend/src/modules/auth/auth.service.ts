@@ -296,6 +296,8 @@ export class AuthService {
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
+    this.emailService.ensureConfigured();
+
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -319,8 +321,7 @@ export class AuthService {
       },
     });
 
-    // Fire-and-forget — don't block the response
-    this.emailService.sendPasswordResetEmail(user.email, resetToken);
+    await this.emailService.sendPasswordResetEmail(user.email, resetToken);
 
     return { message: genericMessage };
   }

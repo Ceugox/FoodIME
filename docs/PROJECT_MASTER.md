@@ -489,15 +489,27 @@ ADMIN_PASSWORD_HASH=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
+### 2026-03-17 — FoodIME V3: Fullstack Next.js 15 Rebuild
+**Problema:** CORS persistente entre NestJS backend e Next.js frontend no Railway (5+ tentativas de fix falharam).
+**Solução:** Rebuild completo como app fullstack Next.js 15 em `foodime-v3/`. Elimina CORS (same-origin).
+**Arquivos:** 118 arquivos criados em `foodime-v3/`:
+- 6 config files (package.json, next.config.ts, tailwind, Dockerfile, etc.)
+- 8 lib files (prisma, jwt, email, mercadopago, supabase, api-client, constants)
+- 5 API middleware wrappers (auth, roles, validate, rate-limit, errors)
+- 8 services (auth, stores, products, orders, payments, admin, coupons, uploads)
+- 5 Zod schemas (auth, stores, products, orders, admin/payments)
+- 44 API routes (10 auth + 8 stores/products + 1 upload + 7 orders + 3 payments + 13 admin + 1 coupons + 1 cron)
+- 4 React Query hooks (useAuth, useStores/Products, useOrders, usePayment, useAdmin)
+- 2 Zustand stores (authStore, cartStore)
+- 1 middleware (JWT + role redirect)
+- 25 pages (5 auth + 7 buyer + 5 seller + 6 admin + 1 offline + 1 root)
+- 5 components (toast, bottom-nav, loading-skeleton, error-state, stock-badge)
+**Build:** `npm run build` passa com sucesso — 54 rotas compiladas.
+
 ### [2026-03-17] Full integration testing — All 3 profiles functional
 - **Problema:** (1) Cart `addItem` silently failed — `isAvailable` missing from Prisma `select`. (2) Checkout PIX timeout (Axios 10s). (3) Seller metrics 500 — `READY` enum missing from PostgreSQL. (4) Admin CORS blocked (port 3002 not in origin list). (5) All users had broken accounts (sellers PENDING, admins missing bcrypt hash). (6) Web middleware had no ADMIN role handling.
 - **Solução:** (1) Added `isAvailable: true` to store product selects. (2) Axios timeout → 30s + checkout auto-detects existing payments. (3) `ALTER TYPE "OrderStatus" ADD VALUE 'READY'` + migration tracked. (4) Added `CORS_ORIGINS=...,localhost:3002` to backend .env + code default. (5) Script fixed all users: sellers ACTIVE+emailVerified, admins bcrypt password. (6) Web middleware now redirects ADMIN→`/admin/dashboard` + protects `/admin/*` routes.
 - **Arquivos:** `stores.service.ts`, `api.ts`, `checkout/[orderId]/page.tsx`, `main.ts`, `web/src/middleware.ts`, migration `20260317_add_ready_status`, `.env`
-
-### [2026-03-17] Fix CORS — middleware before NestJS route binding
-- **Problema:** CORS middleware registrado via `app.use()` após `NestFactory.create()` ficava no stack do Express DEPOIS das rotas do NestJS. Requisições OPTIONS preflight eram processadas pelo pipeline NestJS (guards/filters) que retornava 404 sem headers CORS, antes do middleware manual executar.
-- **Solução:** Criada instância Express separada (`express()`) com CORS middleware + Helmet registrados PRIMEIRO, passada ao NestJS via `new ExpressAdapter(server)`. Garante que CORS middleware está no topo do stack, antes de qualquer rota NestJS.
-- **Arquivos:** `backend/src/main.ts`
 
 
 ---

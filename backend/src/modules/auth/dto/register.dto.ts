@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 
 export class RegisterDto {
@@ -16,6 +17,7 @@ export class RegisterDto {
   password: string;
 
   @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.replace(/\D/g, '') : value)
   @IsString()
   @Matches(/^\+?\d{10,15}$/, { message: 'Telefone deve ter entre 10 e 15 dígitos' })
   phone?: string;

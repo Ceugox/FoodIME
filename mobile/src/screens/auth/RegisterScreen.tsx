@@ -30,15 +30,20 @@ export function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'BUYER' | 'SELLER'>('BUYER');
 
+  const normalizePhone = (value: string) => value.replace(/\D/g, '');
+
   const handleRegister = () => {
     if (!name || !email || !phone || !password) {
       Alert.alert('Atenção', 'Preencha todos os campos');
       return;
     }
     register.mutate(
-      { name, email, phone, password, role },
+      { name, email, phone: normalizePhone(phone), password, role },
       {
-        onError: () => Alert.alert('Erro', 'Não foi possível criar a conta'),
+        onError: (error: any) => {
+          const message = error?.response?.data?.message;
+          Alert.alert('Erro', Array.isArray(message) ? message[0] : message || 'Não foi possível criar a conta');
+        },
       },
     );
   };
@@ -122,7 +127,7 @@ export function RegisterScreen() {
         />
         <Input
           label="Senha"
-          placeholder="Mínimo 6 caracteres"
+          placeholder="Mínimo 8 caracteres, com maiúscula, minúscula e número"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
