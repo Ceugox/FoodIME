@@ -13,6 +13,16 @@ interface AuthResponse {
   };
 }
 
+type GoogleAuthResponse =
+  | AuthResponse
+  | {
+      data: {
+        user: { id: string; name: string; email: string; role: 'BUYER' | 'SELLER' | 'ADMIN' };
+        message: string;
+        needsApproval: true;
+      };
+    };
+
 export function useLogin() {
   const setUser = useAuthStore((s) => s.setUser);
 
@@ -57,9 +67,9 @@ export function useGoogleAuth() {
 
   return useMutation({
     mutationFn: (data: { credential: string; role?: string }) =>
-      api<AuthResponse>('/api/auth/google', { method: 'POST', body: JSON.stringify(data) }),
+      api<GoogleAuthResponse>('/api/auth/google', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: (response) => {
-      if (response.data.user) {
+      if ('accessToken' in response.data && response.data.user) {
         setUser(response.data.user);
       }
     },

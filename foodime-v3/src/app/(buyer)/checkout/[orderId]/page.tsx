@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { createCardToken } from '@/lib/mercadopago-client';
 import { useOrder } from '@/hooks/useOrders';
 import { useInitiatePayment, usePaymentByOrder } from '@/hooks/usePayment';
 import { useCartStore } from '@/store/cartStore';
@@ -15,6 +16,7 @@ interface CardData {
   name: string;
   expiry: string;
   cvv: string;
+  cpf: string;
 }
 
 export default function CheckoutPage() {
@@ -28,10 +30,11 @@ export default function CheckoutPage() {
   const [pixData, setPixData] = useState<{ qrCode: string; qrCodeBase64: string } | null>(null);
   const [pixExpiry, setPixExpiry] = useState<Date | null>(null);
   const [countdown, setCountdown] = useState('');
-  const [cardData, setCardData] = useState<CardData>({ number: '', name: '', expiry: '', cvv: '' });
+  const [paymentStarted, setPaymentStarted] = useState(false);
+  const [cardData, setCardData] = useState<CardData>({ number: '', name: '', expiry: '', cvv: '', cpf: '' });
 
   const isPaid = order?.status === 'PAID' || order?.status === 'READY' || order?.status === 'PICKED_UP';
-  const shouldPoll = !!pixData || isPaid;
+  const shouldPoll = paymentStarted || isPaid;
   const { data: paymentData } = usePaymentByOrder(orderId, shouldPoll);
 
   // Redirect when paid
@@ -68,19 +71,38 @@ export default function CheckoutPage() {
         qrCodeBase64: result.data.pixQrCodeBase64,
       });
       setPixExpiry(new Date(Date.now() + PIX_EXPIRY_MINUTES * 60 * 1000));
+      setPaymentStarted(true);
     } catch (err: any) {
       toast({ title: err?.message || 'Erro ao gerar PIX', variant: 'error' });
     }
   }, [orderId, initiate]);
 
   const handleCardPayment = useCallback(async () => {
-    if (!cardData.number || !cardData.name || !cardData.expiry || !cardData.cvv) {
+    const sanitizedNumber = cardData.number.replace(/\D/g, '');
+    const sanitizedCpf = cardData.cpf.replace(/\D/g, '');
+    const [expirationMonth = '', expirationYear = ''] = cardData.expiry.split('/');
+
+    if (!sanitizedNumber || !cardData.name || !expirationMonth || !expirationYear || !cardData.cvv || sanitizedCpf.length !== 11) {
       toast({ title: 'Preencha todos os campos do cartão', variant: 'error' });
       return;
     }
-    // In production, use MercadoPago JS SDK to create card token
-    // For now, send a placeholder message
-    toast({ title: 'Integração com SDK do Mercado Pago necessária para tokenização do cartão', variant: 'error' });
+
+    try {
+      const cardToken = await createCardToken({
+        cardNumber: sanitizedNumber,
+        cardholderName: cardData.name,
+        expirationMonth,
+        expirationYear,
+        securityCode: cardData.cvv,
+        identificationNumber: sanitizedCpf,
+      });
+
+      await initiate.mutateAsync({ orderId, method: 'CREDIT_CARD', cardToken });
+      setPaymentStarted(true);
+      toast({ title: 'Pagamento enviado. Validando com o Mercado Pago...', variant: 'success' });
+    } catch (err: any) {
+      toast({ title: err?.message || 'Erro ao processar pagamento com cartão', variant: 'error' });
+    }
   }, [cardData]);
 
   const copyPixCode = useCallback(async () => {
@@ -247,6 +269,25 @@ export default function CheckoutPage() {
                   className="w-full h-12 bg-background border border-border rounded-xl px-4 text-text text-sm placeholder:text-text-muted focus:border-primary focus:outline-none"
                 />
               </div>
+            </div>
+            <div>
+              <label className="text-text-secondary text-xs font-semibold mb-1 block">CPF do titular</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={14}
+                placeholder="000.000.000-00"
+                value={cardData.cpf}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+                  const masked = digits
+                    .replace(/^(\d{3})(\d)/, '$1.$2')
+                    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+                    .replace(/\.(\d{3})(\d)/, '.$1-$2');
+                  setCardData({ ...cardData, cpf: masked });
+                }}
+                className="w-full h-12 bg-background border border-border rounded-xl px-4 text-text text-sm placeholder:text-text-muted focus:border-primary focus:outline-none"
+              />
             </div>
           </div>
 

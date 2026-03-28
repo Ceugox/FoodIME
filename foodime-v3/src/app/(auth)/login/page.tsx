@@ -3,25 +3,32 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useLogin, useResendVerification } from '@/hooks/useAuth';
+import { GoogleAuthButton } from '@/components/common/google-auth-button';
+import { useGoogleAuth, useLogin, useResendVerification } from '@/hooks/useAuth';
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [showResend, setShowResend] = useState(false);
   const [resendEmail, setResendEmail] = useState('');
   const login = useLogin();
+  const googleAuth = useGoogleAuth();
   const resend = useResendVerification();
   const router = useRouter();
+
+  function redirectByRole(role: 'BUYER' | 'SELLER' | 'ADMIN') {
+    router.replace(role === 'SELLER' ? '/dashboard' : role === 'ADMIN' ? '/admin/dashboard' : '/home');
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    setInfo('');
     setShowResend(false);
     try {
       const result = await login.mutateAsync(form);
-      const role = result.data.user.role;
-      router.replace(role === 'SELLER' ? '/dashboard' : role === 'ADMIN' ? '/admin/dashboard' : '/home');
+      redirectByRole(result.data.user.role);
     } catch (err: any) {
       const msg = err?.message || 'Email ou senha incorretos';
       setError(msg);
@@ -35,10 +42,30 @@ export default function LoginPage() {
   async function handleResend() {
     try {
       await resend.mutateAsync({ email: resendEmail });
-      setError('Email de verificação reenviado!');
+      setInfo('Email de verificação reenviado!');
+      setError('');
       setShowResend(false);
     } catch {
       // silent
+    }
+  }
+
+  async function handleGoogleLogin(credential: string) {
+    setError('');
+    setInfo('');
+    setShowResend(false);
+
+    try {
+      const result = await googleAuth.mutateAsync({ credential });
+
+      if ('accessToken' in result.data) {
+        redirectByRole(result.data.user.role);
+        return;
+      }
+
+      setInfo(result.data.message || 'Conta criada com Google. Aguarde aprovação do administrador.');
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao entrar com Google');
     }
   }
 
@@ -91,6 +118,15 @@ export default function LoginPage() {
             </div>
           )}
 
+          {info && (
+            <div className="flex items-center gap-2 bg-success/10 border border-success/30 rounded-xl px-4 py-2.5 animate-scale-in">
+              <svg className="w-4 h-4 text-success flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+              <p className="text-success text-xs">{info}</p>
+            </div>
+          )}
+
           {showResend && (
             <button
               type="button"
@@ -110,6 +146,17 @@ export default function LoginPage() {
             {login.isPending ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
+
+        <div className="my-4 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">ou</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        <GoogleAuthButton
+          onCredential={handleGoogleLogin}
+          disabled={login.isPending || googleAuth.isPending}
+        />
 
         <p className="text-center text-text-secondary text-sm mt-6">
           Não tem conta?{' '}

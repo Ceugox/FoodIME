@@ -3,15 +3,6 @@ name: Manual Deploy
 on:
   workflow_dispatch:
     inputs:
-      service:
-        description: 'Service to deploy'
-        required: true
-        type: choice
-        options:
-          - backend
-          - web
-          - admin
-          - all
       environment:
         description: 'Target environment'
         required: true
@@ -21,9 +12,8 @@ on:
           - production
 
 jobs:
-  deploy-backend:
-    name: Deploy Backend
-    if: inputs.service == 'backend' || inputs.service == 'all'
+  deploy-foodime-v3:
+    name: Deploy FoodIME V3
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
@@ -33,43 +23,9 @@ jobs:
         with:
           node-version: 20
 
-      - name: Deploy Backend to Railway
+      - name: Deploy FoodIME V3 to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           npm i -g @railway/cli
           railway up --service backend
-
-  deploy-web:
-    name: Deploy Web PWA
-    if: inputs.service == 'web' || inputs.service == 'all'
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy Web to Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
-          vercel-args: '--prod'
-          working-directory: web
-
-  deploy-admin:
-    name: Deploy Admin
-    if: inputs.service == 'admin' || inputs.service == 'all'
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy Admin to Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
-          vercel-args: '--prod'
-          working-directory: admin

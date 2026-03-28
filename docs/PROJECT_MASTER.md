@@ -6,7 +6,7 @@
 
 ## 1. Visão Geral do Produto
 
-SaaS mobile de venda de comida dentro de faculdades, começando pelo IME (Instituto Militar de Engenharia). Centraliza vendedores informais de comida (doces, salgados, marmitas) e compradores (alunos) numa plataforma com pagamento in-app, split automático de comissão e gestão de estoque em tempo real.
+Marketplace de comida para faculdades, começando pelo IME (Instituto Militar de Engenharia), agora consolidado na **FoodIME V3**: um app fullstack em Next.js 15 que reúne comprador, vendedor, admin e API no mesmo deploy. O app mobile Expo permanece no repositório apenas como legado congelado.
 
 **Três perfis de usuário:**
 - **Comprador** — descobre vendedores, faz pedidos e paga pelo app
@@ -19,7 +19,7 @@ SaaS mobile de venda de comida dentro de faculdades, começando pelo IME (Instit
 
 - Cada pedido pertence a **um único vendedor** (sem carrinho multi-vendedor)
 - Pagamento ocorre **antes da retirada** — comprador paga no app e mostra comprovante
-- Split é **instantâneo**: no momento da liquidação, gateway retém comissão e repassa líquido ao vendedor via Pix
+- **Não há split automático**: todo pagamento cai na conta da empresa e o repasse ao vendedor é registrado manualmente pelo admin
 - Estoque é decrementado **atomicamente** via transação no banco após confirmação do webhook de pagamento
 - Se estoque zerar entre o carrinho e o pagamento, pedido é recusado e valor estornado
 - Produtos com **menos de 10 unidades** exibem badge "Últimas unidades" para compradores
@@ -35,34 +35,30 @@ SaaS mobile de venda de comida dentro de faculdades, começando pelo IME (Instit
 
 ## 3. Stack Tecnológica
 
-### Mobile
-- **Framework:** React Native com Expo (SDK gerenciado)
+### Plataforma Principal
+- **App:** `foodime-v3/`
+- **Framework:** Next.js 15 (App Router + Route Handlers)
 - **Linguagem:** TypeScript
-- **Navegação:** React Navigation (dois stacks: buyer e seller, carregados por role)
+- **UI:** React 19 + Tailwind CSS + PWA (`next-pwa`)
 - **Estado global:** Zustand
-- **Cache/fetching:** React Query (TanStack Query)
-- **HTTP:** Axios com interceptor de refresh token JWT
-- **Notificações push:** Expo Notifications + Firebase Cloud Messaging
-- **Tempo real:** Socket.io client (para pedidos entrando no vendedor)
-
-### Backend
-- **Runtime:** Node.js
-- **Framework:** NestJS (TypeScript)
+- **Cache/fetching:** TanStack Query
 - **ORM:** Prisma
 - **Banco:** PostgreSQL via Supabase
-- **Tempo real:** Socket.io integrado ao NestJS
-- **Autenticação:** JWT + Refresh Token
+- **Autenticação:** JWT + Refresh Token em cookies HTTP-only
+- **Uploads:** Supabase Storage
+- **Emails:** Nodemailer
 
-### Painel Admin
-- **Framework:** Next.js (TypeScript)
-- **UI:** shadcn/ui + Tremor para dashboards
-- **Hospedagem:** Vercel
+### Aplicações Legadas
+- `backend/` — API NestJS antiga, mantida apenas como referência
+- `web/` — frontend Next.js antigo, substituído pela V3
+- `admin/` — painel admin separado antigo, substituído pela V3
+- `mobile/` — app Expo congelado; não modificar
 
 ### Infraestrutura
-- **Backend:** Railway (Docker)
+- **Deploy principal:** Railway (Docker) via `foodime-v3/Dockerfile`
 - **Banco + Storage:** Supabase
-- **App mobile:** Expo EAS Build
-- **CI/CD:** GitHub Actions → Railway e Vercel
+- **CI/CD:** GitHub Actions → Railway
+- **App mobile legado:** Expo EAS Build
 
 ### Gateway de Pagamento
 - **Plataforma:** Mercado Pago
@@ -121,212 +117,64 @@ SaaS mobile de venda de comida dentro de faculdades, começando pelo IME (Instit
 
 ## 6. Estrutura de Pastas
 
-### Backend (NestJS)
+### Aplicação Principal (FoodIME V3)
 ```
-backend/
-├── src/
-│   ├── modules/
-│   │   ├── auth/
-│   │   │   ├── auth.controller.ts
-│   │   │   ├── auth.service.ts
-│   │   │   ├── auth.module.ts
-│   │   │   ├── strategies/        ← jwt.strategy.ts, refresh.strategy.ts
-│   │   │   └── dto/
-│   │   ├── users/
-│   │   ├── stores/
-│   │   ├── products/
-│   │   ├── orders/
-│   │   ├── payments/
-│   │   │   ├── payments.service.ts
-│   │   │   ├── webhook.controller.ts   ← endpoint do webhook Mercado Pago
-│   │   │   └── mercadopago.service.ts  ← wrapper da API Mercado Pago
-│   │   └── notifications/
-│   │       ├── notifications.gateway.ts  ← Socket.io gateway
-│   │       └── push.service.ts           ← Expo push notifications
-│   ├── common/
-│   │   ├── guards/                ← JwtAuthGuard, RolesGuard
-│   │   ├── decorators/            ← @Roles(), @CurrentUser()
-│   │   ├── interceptors/
-│   │   └── pipes/
-│   ├── prisma/
-│   │   ├── prisma.service.ts
-│   │   └── schema.prisma
-│   └── main.ts
-├── Dockerfile
-└── .env.example
-```
-
-### Mobile (React Native + Expo)
-```
-mobile/
-├── src/
-│   ├── screens/
-│   │   ├── auth/
-│   │   │   ├── LoginScreen.tsx
-│   │   │   └── RegisterScreen.tsx
-│   │   ├── buyer/
-│   │   │   ├── HomeScreen.tsx         ← lista de vendedores ativos
-│   │   │   ├── StoreScreen.tsx        ← produtos do vendedor
-│   │   │   ├── CartScreen.tsx
-│   │   │   ├── CheckoutScreen.tsx
-│   │   │   ├── OrderConfirmScreen.tsx ← comprovante
-│   │   │   └── OrderHistoryScreen.tsx
-│   │   └── seller/
-│   │       ├── DashboardScreen.tsx    ← métricas financeiras
-│   │       ├── OrdersScreen.tsx       ← pedidos em tempo real
-│   │       ├── ProductsScreen.tsx     ← CRUD + edição rápida de estoque
-│   │       └── StoreSettingsScreen.tsx
-│   ├── components/
-│   │   ├── common/                ← Button, Input, Card, Badge, LoadingState, ErrorState
-│   │   ├── buyer/                 ← StoreCard, ProductCard, CartItem
-│   │   └── seller/                ← OrderCard, ProductRow, StockEditor
-│   ├── hooks/
-│   │   ├── useAuth.ts
-│   │   ├── useCart.ts
-│   │   └── useSocket.ts
-│   ├── services/
-│   │   ├── api.ts                 ← instância Axios configurada
-│   │   ├── auth.service.ts
-│   │   ├── store.service.ts
-│   │   ├── product.service.ts
-│   │   ├── order.service.ts
-│   │   └── payment.service.ts
-│   ├── store/
-│   │   ├── authStore.ts           ← Zustand: usuário logado, tokens
-│   │   ├── cartStore.ts           ← Zustand: itens do carrinho
-│   │   └── notificationStore.ts
-│   ├── navigation/
-│   │   ├── RootNavigator.tsx      ← decide stack por role
-│   │   ├── BuyerNavigator.tsx
-│   │   └── SellerNavigator.tsx
-│   └── types/
-│       ├── api.types.ts
-│       ├── models.types.ts
-│       └── navigation.types.ts
-├── app.json
-└── .env.example
-```
-
-### Painel Admin (Next.js)
-```
-admin/
+foodime-v3/
 ├── src/
 │   ├── app/
-│   │   ├── (auth)/login/
-│   │   ├── dashboard/
-│   │   ├── users/
-│   │   ├── sellers/
-│   │   │   └── [id]/              ← dashboard individual do vendedor
-│   │   ├── buyers/
-│   │   │   └── [id]/              ← histórico de compras
-│   │   ├── orders/
-│   │   └── payouts/
+│   │   ├── (auth)/                ← login, registro, recuperação, verificação
+│   │   ├── (buyer)/               ← home, loja, carrinho, checkout, pedidos
+│   │   ├── (seller)/              ← dashboard, pedidos, produtos, loja
+│   │   ├── (admin)/               ← dashboard, usuários, transações, repasses
+│   │   └── api/                   ← auth, stores, products, orders, payments, admin
 │   ├── components/
-│   └── lib/
-└── .env.example
+│   ├── hooks/
+│   ├── lib/
+│   ├── schemas/
+│   ├── services/
+│   ├── store/
+│   └── types/
+├── prisma/
+├── public/
+└── Dockerfile
 ```
+
+### Legado
+- `backend/`, `web/` e `admin/` existem apenas como referência histórica da arquitetura separada
+- `mobile/` permanece congelado e fora do escopo atual
 
 ---
 
 ## 7. Schema do Banco (Prisma)
 
-```prisma
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  phone     String
-  role      Role     @default(BUYER)
-  store     Store?
-  orders    Order[]
-  createdAt DateTime @default(now())
-}
+**Fonte canônica:** `foodime-v3/prisma/schema.prisma`
 
-model Store {
-  id          String    @id @default(uuid())
-  owner       User      @relation(fields: [ownerId], references: [id])
-  ownerId     String    @unique
-  name        String
-  description String
-  imageUrl    String?
-  whatsapp    String
-  pixKey      String
-  commissionRate Decimal @default(0.10)
-  isOpen      Boolean   @default(false)
-  products    Product[]
-  orders      Order[]
-}
-
-model Product {
-  id          String      @id @default(uuid())
-  store       Store       @relation(fields: [storeId], references: [id])
-  storeId     String
-  name        String
-  imageUrl    String?
-  price       Decimal
-  stockQty    Int
-  isAvailable Boolean     @default(true)
-  orderItems  OrderItem[]
-}
-
-model Order {
-  id          String      @id @default(uuid())
-  buyer       User        @relation(fields: [buyerId], references: [id])
-  buyerId     String
-  store       Store       @relation(fields: [storeId], references: [id])
-  storeId     String
-  items       OrderItem[]
-  payment     Payment?
-  status      OrderStatus @default(PENDING)
-  code        String      @unique  // comprovante exibido pro comprador
-  totalAmount Decimal
-  createdAt   DateTime    @default(now())
-}
-
-model OrderItem {
-  id              String  @id @default(uuid())
-  order           Order   @relation(fields: [orderId], references: [id])
-  orderId         String
-  product         Product @relation(fields: [productId], references: [id])
-  productId       String
-  quantity        Int
-  priceAtPurchase Decimal // snapshot — não muda se vendedor alterar preço
-}
-
-model Payment {
-  id           String        @id @default(uuid())
-  order        Order         @relation(fields: [orderId], references: [id])
-  orderId      String        @unique
-  method       PaymentMethod
-  gatewayTxId  String        // ID do pagamento no Mercado Pago
-  grossAmount  Decimal
-  commission   Decimal
-  netAmount    Decimal
-  status       PaymentStatus @default(PROCESSING)
-  createdAt    DateTime      @default(now())
-}
-
-enum Role          { BUYER SELLER ADMIN }
-enum OrderStatus   { PENDING PAID PICKED_UP CANCELLED }
-enum PaymentMethod { PIX CREDIT_CARD }
-enum PaymentStatus { PROCESSING PAID FAILED REFUNDED }
-```
+Principais entidades da V3:
+- `User` — comprador, vendedor ou admin; inclui `status`, verificação de email, OAuth Google e soft delete
+- `RefreshToken` — persistência de refresh tokens no banco
+- `Store` — dados da loja, horários, taxa de comissão e relação com repasses
+- `Product` — estoque, disponibilidade e soft delete
+- `Order` / `OrderItem` — pedido, comprovante, snapshot de preço e status (`PENDING`, `PAID`, `READY`, `PICKED_UP`, `CANCELLED`)
+- `Payment` — método, gatewayTxId, comissão, líquido e motivo de estorno
+- `Coupon` — cupons fixos ou percentuais
+- `Payout` — repasses manuais registrados pelo admin
+- `AuditLog` — trilha de ações administrativas
 
 ---
 
 ## 8. Fluxo Completo de Compra
 
 ```
-1. Comprador confirma pedido no app
-2. App → POST /orders → backend cria Order (status: PENDING)
-3. Backend → Mercado Pago: cria pagamento (Pix ou Cartão)
-   └── Todo valor vai para conta MP da empresa
+1. Comprador confirma pedido no app web/PWA
+2. Front → POST /api/orders → route handler cria Order (status: PENDING)
+3. Route handler → service Prisma cria pedido e prepara checkout
+4. Front → POST /api/payments/initiate → integra com Mercado Pago
+   └── Todo valor vai para a conta MP da empresa
 
 FLUXO PIX:
 4a. Mercado Pago retorna QR Code Pix (copia-e-cola + base64)
 5a. Comprador efetua pagamento no app do banco
-6a. Mercado Pago → webhook POST /payments/webhook
+6a. Mercado Pago → webhook POST /api/payments/webhook
 7a. Backend valida x-signature do webhook + consulta GET /v1/payments/:id
 8a. Transação Prisma atômica (ver abaixo)
 
@@ -341,11 +189,9 @@ CONFIRMAÇÃO (transação Prisma atômica):
    └── Decrementa stockQty
    └── Atualiza Order.status = PAID
    └── Atualiza Payment.status = PAID
-9. Backend emite evento Socket.io → app do vendedor
-10. Backend dispara push notification (FCM) → vendedor
-11. Comprador vê tela de comprovante com código único
-12. Vendedor vê pedido em tempo real + notificação
-13. Admin vê comissão e valor líquido → repassa vendedor manualmente via Pix
+9. Comprador vê tela de comprovante com código único
+10. Vendedor acompanha pedidos pela interface web da V3
+11. Admin vê comissão e valor líquido → registra repasse manual
 ```
 
 **Caso de falha de estoque:**
@@ -433,45 +279,42 @@ CONFIRMAÇÃO (transação Prisma atômica):
 - [x] Admin: painel de repasses (saldo devedor por vendedor, registrar repasse, histórico)
 
 ### Sprint 9 — Polish, Testes e Beta
-- [ ] Testes de integração nos fluxos críticos (compra, webhook, estoque)
-- [ ] Tratamento de edge cases (timeout de pagamento, app fechado durante compra)
-- [ ] UX review nas telas principais
-- [x] Configurar RLS completo no Supabase MCP
-- [ ] Deploy backend no Railway
-- [ ] Deploy admin na Vercel
-- [ ] Build do app via Expo EAS (TestFlight + APK interno)
-- [ ] Beta fechado com 3–5 vendedores e grupo seleto de compradores no IME
+- [x] Consolidar buyer, seller, admin e API em `foodime-v3`
+- [x] Definir `foodime-v3` como stack oficial de entrega
+- [x] Alinhar Railway raiz com `foodime-v3`
+- [x] Criar workflow de CI/CD para `foodime-v3`
+- [x] Revisar variáveis de ambiente de produção da V3
+- [x] Preparar checklist de smoke test/go-live
+- [ ] Testes de integração nos fluxos críticos (auth, pedido, pagamento, webhook)
+- [ ] Homologação completa do Mercado Pago sandbox (Pix + cartão)
+- [ ] Revisão de edge cases (timeout, email, cron, upload)
+- [ ] Deploy da `foodime-v3` no Railway
+- [ ] Beta fechado com 3–5 vendedores e compradores no IME
 
 ---
 
 ## 10. Variáveis de Ambiente
 
-### Backend (.env)
+### FoodIME V3 (.env)
 ```
 DATABASE_URL=
+DIRECT_URL=
 JWT_SECRET=
 JWT_REFRESH_SECRET=
 MERCADOPAGO_ACCESS_TOKEN=
 MERCADOPAGO_WEBHOOK_SECRET=
-SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_KEY=
-EXPO_ACCESS_TOKEN=
-PORT=3000
+NEXT_PUBLIC_APP_URL=
+CRON_SECRET=
+GMAIL_USER=
+GMAIL_APP_PASSWORD=
+EMAIL_FROM=
+GOOGLE_CLIENT_ID=
 ```
 
-### Mobile (.env)
-```
-EXPO_PUBLIC_API_URL=
-EXPO_PUBLIC_SUPABASE_URL=
-EXPO_PUBLIC_SUPABASE_ANON_KEY=
-```
-
-### Admin (.env)
-```
-NEXT_PUBLIC_API_URL=
-ADMIN_EMAIL=
-ADMIN_PASSWORD_HASH=
-```
+**Legado:** os `.env` de `backend/`, `web/`, `admin/` e `mobile/` ficam apenas para referência histórica.
 
 ---
 
@@ -479,9 +322,9 @@ ADMIN_PASSWORD_HASH=
 
 - Webhook Mercado Pago: validar header `x-signature` com HMAC-SHA256 antes de qualquer processamento; sempre consultar GET /v1/payments/:id para confirmar status real
 - Cartão salvo: armazenar apenas token do Mercado Pago SDK, nunca dados de cartão
-- Admin: rota separada do app mobile, autenticação independente, role ADMIN verificado em todo endpoint sensível
+- Admin: rotas `/admin/*` vivem no mesmo app da V3, protegidas por middleware e checagem de role ADMIN
 - RLS Supabase: toda tabela com RLS habilitado — vendedor só lê/edita seus próprios produtos e pedidos, comprador só lê seus próprios pedidos
-- Tokens JWT: access token com expiração curta (15min), refresh token com expiração longa (7 dias) armazenado em storage seguro
+- Tokens JWT: access token com expiração curta (15min), refresh token com expiração longa (7 dias) armazenados em cookies HTTP-only + tabela `RefreshToken`
 
 ---
 
@@ -489,27 +332,15 @@ ADMIN_PASSWORD_HASH=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
-### 2026-03-17 — FoodIME V3: Fullstack Next.js 15 Rebuild
-**Problema:** CORS persistente entre NestJS backend e Next.js frontend no Railway (5+ tentativas de fix falharam).
-**Solução:** Rebuild completo como app fullstack Next.js 15 em `foodime-v3/`. Elimina CORS (same-origin).
-**Arquivos:** 118 arquivos criados em `foodime-v3/`:
-- 6 config files (package.json, next.config.ts, tailwind, Dockerfile, etc.)
-- 8 lib files (prisma, jwt, email, mercadopago, supabase, api-client, constants)
-- 5 API middleware wrappers (auth, roles, validate, rate-limit, errors)
-- 8 services (auth, stores, products, orders, payments, admin, coupons, uploads)
-- 5 Zod schemas (auth, stores, products, orders, admin/payments)
-- 44 API routes (10 auth + 8 stores/products + 1 upload + 7 orders + 3 payments + 13 admin + 1 coupons + 1 cron)
-- 4 React Query hooks (useAuth, useStores/Products, useOrders, usePayment, useAdmin)
-- 2 Zustand stores (authStore, cartStore)
-- 1 middleware (JWT + role redirect)
-- 25 pages (5 auth + 7 buyer + 5 seller + 6 admin + 1 offline + 1 root)
-- 5 components (toast, bottom-nav, loading-skeleton, error-state, stock-badge)
-**Build:** `npm run build` passa com sucesso — 54 rotas compiladas.
+### 2026-03-28 — Hardening dos fluxos de auth e pagamento na V3
+**Problema:** A V3 já tinha backend para Google Auth e Mercado Pago, mas a UI ainda não expunha login com Google e o checkout de cartão permanecia em placeholder, impedindo entrega completa dos fluxos críticos.
+**Solução:** Adicionada integração de Google Auth nas telas de login e cadastro, provider OAuth no app, tokenização de cartão com chave pública do Mercado Pago no checkout e polling de pagamento após iniciar PIX/cartão. Também foram alinhados os exemplos de variáveis de ambiente para Google e email.
+**Arquivos:** `foodime-v3/src/app/providers.tsx`, `foodime-v3/src/components/common/google-auth-button.tsx`, `foodime-v3/src/lib/mercadopago-client.ts`, `foodime-v3/src/hooks/useAuth.ts`, `foodime-v3/src/app/(auth)/login/page.tsx`, `foodime-v3/src/app/(auth)/register/page.tsx`, `foodime-v3/src/app/(buyer)/checkout/[orderId]/page.tsx`, `foodime-v3/.env.example`, `docs/PROJECT_MASTER.md`
 
-### [2026-03-17] Full integration testing — All 3 profiles functional
-- **Problema:** (1) Cart `addItem` silently failed — `isAvailable` missing from Prisma `select`. (2) Checkout PIX timeout (Axios 10s). (3) Seller metrics 500 — `READY` enum missing from PostgreSQL. (4) Admin CORS blocked (port 3002 not in origin list). (5) All users had broken accounts (sellers PENDING, admins missing bcrypt hash). (6) Web middleware had no ADMIN role handling.
-- **Solução:** (1) Added `isAvailable: true` to store product selects. (2) Axios timeout → 30s + checkout auto-detects existing payments. (3) `ALTER TYPE "OrderStatus" ADD VALUE 'READY'` + migration tracked. (4) Added `CORS_ORIGINS=...,localhost:3002` to backend .env + code default. (5) Script fixed all users: sellers ACTIVE+emailVerified, admins bcrypt password. (6) Web middleware now redirects ADMIN→`/admin/dashboard` + protects `/admin/*` routes.
-- **Arquivos:** `stores.service.ts`, `api.ts`, `checkout/[orderId]/page.tsx`, `main.ts`, `web/src/middleware.ts`, migration `20260317_add_ready_status`, `.env`
+### 2026-03-28 — Checklist operacional de go-live da V3
+**Problema:** A V3 já buildava localmente, mas ainda faltava uma revisão objetiva das variáveis obrigatórias e um roteiro curto de smoke test para publicação no mesmo dia.
+**Solução:** Foi criado um script de validação de envs da V3 e um checklist de go-live com ordem de validação pós-deploy para auth, Google, email, Mercado Pago, admin e loja.
+**Arquivos:** `foodime-v3/package.json`, `foodime-v3/scripts/check-env.mjs`, `docs/GO_LIVE_CHECKLIST.md`, `docs/PROJECT_MASTER.md`
 
 
 ---

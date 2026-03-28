@@ -3,13 +3,19 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRegister } from '@/hooks/useAuth';
+import { GoogleAuthButton } from '@/components/common/google-auth-button';
+import { useGoogleAuth, useRegister } from '@/hooks/useAuth';
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', role: 'BUYER' as 'BUYER' | 'SELLER' });
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [successState, setSuccessState] = useState<{
+    title: string;
+    message: string;
+    secondaryMessage?: string;
+  } | null>(null);
   const register = useRegister();
+  const googleAuth = useGoogleAuth();
   const router = useRouter();
 
   function maskPhone(value: string): string {
@@ -27,15 +33,43 @@ export default function RegisterPage() {
         ...form,
         phone: form.phone.replace(/\D/g, ''),
       });
-      setSuccess(true);
+      setSuccessState({
+        title: 'Verifique seu email',
+        message: `Enviamos um link de verificação para ${form.email}`,
+        secondaryMessage:
+          form.role === 'SELLER'
+            ? 'Após verificar seu email, sua conta será analisada por um administrador antes de ser liberada.'
+            : 'O link expira em 24 horas.',
+      });
     } catch (err: any) {
       setError(err?.message || 'Erro ao criar conta');
     }
   }
 
+  async function handleGoogleRegister(credential: string) {
+    setError('');
+
+    try {
+      const result = await googleAuth.mutateAsync({ credential, role: form.role });
+
+      if ('accessToken' in result.data) {
+        router.replace(result.data.user.role === 'SELLER' ? '/dashboard' : '/home');
+        return;
+      }
+
+      setSuccessState({
+        title: 'Conta criada com Google',
+        message: result.data.message || 'Sua conta foi criada com sucesso.',
+        secondaryMessage: 'Você poderá entrar assim que a aprovação for concluída.',
+      });
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao criar conta com Google');
+    }
+  }
+
   const inputClass = 'w-full h-12 bg-surface-2 border border-border rounded-xl px-4 text-text placeholder:text-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none text-sm transition-all';
 
-  if (success) {
+  if (successState) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6">
         <div className="w-full max-w-sm animate-slide-up text-center">
@@ -44,16 +78,15 @@ export default function RegisterPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
             </svg>
           </div>
-          <h1 className="text-2xl font-serif text-text mb-2">Verifique seu email</h1>
+          <h1 className="text-2xl font-serif text-text mb-2">{successState.title}</h1>
           <p className="text-text-secondary text-sm mb-2">
-            Enviamos um link de verificação para <strong className="text-text">{form.email}</strong>
+            {successState.message}
           </p>
-          {form.role === 'SELLER' && (
+          {successState.secondaryMessage && (
             <p className="text-text-muted text-xs mb-4 bg-warning/10 border border-warning/30 rounded-xl px-4 py-2">
-              Após verificar seu email, sua conta será analisada por um administrador antes de ser liberada.
+              {successState.secondaryMessage}
             </p>
           )}
-          <p className="text-text-muted text-xs mb-6">O link expira em 24 horas.</p>
           <Link href="/login" className="text-accent font-semibold text-sm hover:underline">
             Ir para login
           </Link>
@@ -138,6 +171,17 @@ export default function RegisterPage() {
             {register.isPending ? 'Criando conta...' : 'Criar conta'}
           </button>
         </form>
+
+        <div className="my-4 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">ou</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        <GoogleAuthButton
+          onCredential={handleGoogleRegister}
+          disabled={register.isPending || googleAuth.isPending}
+        />
 
         <p className="text-center text-text-secondary text-sm mt-6">
           Já tem conta?{' '}

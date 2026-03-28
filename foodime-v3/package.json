@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "npx prisma generate && next build",
     "start": "node .next/standalone/server.js",
+    "check:env": "node scripts/check-env.mjs",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },
