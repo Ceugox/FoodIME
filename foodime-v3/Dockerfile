@@ -1,11 +1,18 @@
+# Shared base with OpenSSL for Prisma
+FROM node:20-bookworm-slim AS base
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends openssl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
 # Stage 1: Install dependencies
-FROM node:20-bookworm-slim AS deps
+FROM base AS deps
 WORKDIR /app
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
 COPY foodime-v3/package.json foodime-v3/package-lock.json* ./
 RUN npm ci
 
 # Stage 2: Build
-FROM node:20-bookworm-slim AS builder
+FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY foodime-v3/ ./
@@ -17,7 +24,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # Stage 3: Production
-FROM node:20-bookworm-slim AS runner
+FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
