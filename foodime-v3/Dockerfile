@@ -7,8 +7,8 @@ RUN apt-get update -y && \
 # Stage 1: Install dependencies
 FROM base AS deps
 WORKDIR /app
-ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
 COPY foodime-v3/package.json foodime-v3/package-lock.json* ./
+COPY foodime-v3/prisma ./prisma
 RUN npm ci
 
 # Stage 2: Build
