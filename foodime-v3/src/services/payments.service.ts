@@ -80,56 +80,29 @@ export async function initiatePayment(
 
   console.log(`[payments] initiating ${method} for order ${orderId} | payer: ${payerEmail} | env: ${process.env.NODE_ENV}`);
 
-  let gatewayTxId: string;
-  let pixQrCode: string | null = null;
-  let pixQrCodeBase64: string | null = null;
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const returnUrl = `${appUrl}/checkout/${orderId}`;
+  const notificationUrl = /localhost|127\.0\.0\.1/.test(appUrl)
+    ? undefined
+    : `${appUrl}/api/payments/webhook`;
+
+  const items = order.items.map((item) => ({
+    title: item.product.name,
+    quantity: item.quantity,
+    unitPrice: Number(item.priceAtPurchase),
+  }));
 
   if (method === 'PIX') {
-    const result = await mp.createPixPayment({ amount: amountInCents, orderId, payerEmail });
-    gatewayTxId = result.id;
-    pixQrCode = result.pixQrCode;
-    pixQrCodeBase64 = result.pixQrCodeBase64;
-  } else {
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
-    const returnUrl = `${appUrl}/checkout/${orderId}`;
-    const notificationUrl = /localhost|127\.0\.0\.1/.test(appUrl)
-      ? undefined
-      : `${appUrl}/api/payments/webhook`;
-
-    const result = await mp.createCheckoutPreference({
-      orderId,
-      items: order.items.map((item) => ({
-        title: item.product.name,
-        quantity: item.quantity,
-        unitPrice: Number(item.priceAtPurchase),
-      })),
-      returnUrl,
-      notificationUrl,
-    });
-    gatewayTxId = result.id;
-
-    return {
-      data: {
-        gatewayTxId,
-        method,
-        checkoutUrl: result.checkoutUrl,
-      },
-    };
+    const result = await mp.createPixPreference({ orderId, items, returnUrl, notificationUrl });
+    return { data: { gatewayTxId: result.id, method, checkoutUrl: result.checkoutUrl } };
   }
 
-  const commission = (Number(order.totalAmount) * commissionPercent) / 100;
-  const netAmount = Number(order.totalAmount) - commission;
-
-  await prisma.payment.create({
-    data: { orderId, method, gatewayTxId, grossAmount: order.totalAmount, commission, netAmount, status: 'PROCESSING' },
-  });
-
+  const result = await mp.createCheckoutPreference({ orderId, items, returnUrl, notificationUrl });
   return {
     data: {
-      gatewayTxId,
+      gatewayTxId: result.id,
       method,
-      ...(pixQrCode && { pixQrCode }),
-      ...(pixQrCodeBase64 && { pixQrCodeBase64 }),
+      checkoutUrl: result.checkoutUrl,
     },
   };
 }

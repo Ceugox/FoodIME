@@ -85,6 +85,41 @@ export async function createCardPayment(params: CardPaymentParams) {
   };
 }
 
+export async function createPixPreference(params: CheckoutPreferenceParams) {
+  const response = await mpRequest<any>('POST', '/checkout/preferences', {
+    items: params.items.map((item) => ({
+      title: item.title,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      currency_id: 'BRL',
+    })),
+    external_reference: params.orderId,
+    metadata: { order_id: params.orderId },
+    back_urls: {
+      success: params.returnUrl,
+      failure: params.returnUrl,
+      pending: params.returnUrl,
+    },
+    auto_return: 'approved',
+    payment_methods: {
+      default_payment_method_id: 'pix',
+      excluded_payment_types: [
+        { id: 'credit_card' },
+        { id: 'debit_card' },
+        { id: 'ticket' },
+        { id: 'atm' },
+        { id: 'prepaid_card' },
+      ],
+    },
+    ...(params.notificationUrl ? { notification_url: params.notificationUrl } : {}),
+  }, params.orderId);
+
+  return {
+    id: String(response.id),
+    checkoutUrl: response.sandbox_init_point || response.init_point,
+  };
+}
+
 export async function createCheckoutPreference(params: CheckoutPreferenceParams) {
   const response = await mpRequest<any>('POST', '/checkout/preferences', {
     items: params.items.map((item) => ({

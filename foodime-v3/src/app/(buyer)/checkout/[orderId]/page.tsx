@@ -99,12 +99,9 @@ export default function CheckoutPage() {
   const handlePixPayment = useCallback(async () => {
     try {
       const result = await initiate.mutateAsync({ orderId, method: 'PIX' });
-      setPixData({
-        qrCode: result.data.pixQrCode,
-        qrCodeBase64: result.data.pixQrCodeBase64,
-      });
-      setPixExpiry(new Date(Date.now() + PIX_EXPIRY_MINUTES * 60 * 1000));
-      setPaymentStarted(true);
+      const checkoutUrl = result?.data?.checkoutUrl;
+      if (!checkoutUrl) throw new Error('Checkout PIX indisponível');
+      window.location.href = checkoutUrl;
     } catch (err: any) {
       toast({ title: err?.message || 'Erro ao gerar PIX', variant: 'error' });
     }
