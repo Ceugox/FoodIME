@@ -3,19 +3,15 @@ import { AppError } from '@/lib/api/errors';
 import * as mp from '@/lib/mercadopago';
 import type { UserPayload } from '@/lib/jwt';
 
-const CARD_REJECTION_MESSAGES: Record<string, string> = {
-  cc_rejected_insufficient_amount: 'Saldo insuficiente no cartão.',
-  cc_rejected_bad_filled_security_code: 'Código de segurança (CVV) inválido.',
-  cc_rejected_bad_filled_date: 'Data de validade inválida.',
-  cc_rejected_bad_filled_other: 'Dados do cartão inválidos. Verifique e tente novamente.',
-  cc_rejected_bad_filled_card_number: 'Número do cartão inválido.',
-  cc_rejected_call_for_authorize: 'Você precisa autorizar o pagamento junto ao banco emissor.',
-  cc_rejected_card_disabled: 'Cartão desabilitado. Entre em contato com o banco emissor.',
-  cc_rejected_duplicated_payment: 'Pagamento duplicado.',
-  cc_rejected_high_risk: 'Pagamento recusado por motivo de segurança.',
-  cc_rejected_max_attempts: 'Número máximo de tentativas excedido. Use outro cartão.',
-  cc_rejected_other_reason: 'Pagamento recusado pelo banco emissor.',
-};
+function resolveMercadoPagoPayerEmail(email: string): string {
+  const sandboxEmail = process.env.MERCADOPAGO_TEST_PAYER_EMAIL?.trim();
+
+  if (sandboxEmail) {
+    return sandboxEmail;
+  }
+
+  return email;
+}
 
 async function confirmOrderWithStockDecrement(orderId: string): Promise<boolean> {
   let stockFailed = false;
@@ -28,7 +24,10 @@ async function confirmOrderWithStockDecrement(orderId: string): Promise<boolean>
           include: { items: { include: { product: true } } },
         });
 
-        if (order.status === 'PAID') return;
+        if (order.status === 'PAID') {
+          await tx.payment.updateMany({ where: { orderId }, data: { status: 'PAID' } });
+          return;
+        }
 
         for (const item of order.items) {
           const updated = await tx.product.updateMany({
@@ -57,11 +56,15 @@ export async function initiatePayment(
   orderId: string,
   method: 'PIX' | 'CREDIT_CARD',
   user: UserPayload,
-  cardToken?: string,
+  _cardToken?: string,
 ) {
   const order = await prisma.order.findUniqueOrThrow({
     where: { id: orderId },
-    include: { store: true, buyer: { select: { email: true } } },
+    include: {
+      store: true,
+      buyer: { select: { email: true } },
+      items: { include: { product: { select: { name: true } } } },
+    },
   });
 
   if (order.buyerId !== user.id) throw new AppError(400, 'Você não é o comprador deste pedido');
@@ -73,44 +76,43 @@ export async function initiatePayment(
 
   const amountInCents = Math.round(Number(order.totalAmount) * 100);
   const commissionPercent = Number(order.store.commissionRate) * 100;
+  const payerEmail = resolveMercadoPagoPayerEmail(order.buyer.email);
 
   let gatewayTxId: string;
   let pixQrCode: string | null = null;
   let pixQrCodeBase64: string | null = null;
 
   if (method === 'PIX') {
-    const result = await mp.createPixPayment({ amount: amountInCents, orderId, payerEmail: order.buyer.email });
+    const result = await mp.createPixPayment({ amount: amountInCents, orderId, payerEmail });
     gatewayTxId = result.id;
     pixQrCode = result.pixQrCode;
     pixQrCodeBase64 = result.pixQrCodeBase64;
   } else {
-    if (!cardToken) throw new AppError(400, 'cardToken obrigatório para cartão de crédito');
-    const result = await mp.createCardPayment({ amount: amountInCents, orderId, cardToken, payerEmail: order.buyer.email });
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const returnUrl = `${appUrl}/checkout/${orderId}`;
+    const notificationUrl = /localhost|127\.0\.0\.1/.test(appUrl)
+      ? undefined
+      : `${appUrl}/api/payments/webhook`;
+
+    const result = await mp.createCheckoutPreference({
+      orderId,
+      items: order.items.map((item) => ({
+        title: item.product.name,
+        quantity: item.quantity,
+        unitPrice: Number(item.priceAtPurchase),
+      })),
+      returnUrl,
+      notificationUrl,
+    });
     gatewayTxId = result.id;
 
-    if (result.status === 'approved') {
-      const commissionVal = (Number(order.totalAmount) * commissionPercent) / 100;
-      const netVal = Number(order.totalAmount) - commissionVal;
-
-      await prisma.payment.create({
-        data: { orderId, method, gatewayTxId, grossAmount: order.totalAmount, commission: commissionVal, netAmount: netVal, status: 'PROCESSING' },
-      });
-
-      const stockOk = await confirmOrderWithStockDecrement(orderId);
-      if (!stockOk) {
-        try { await mp.refundPayment(gatewayTxId); } catch (e) { console.error('Refund failed:', e); }
-        await prisma.$transaction([
-          prisma.payment.update({ where: { orderId }, data: { status: 'REFUNDED', refundReason: 'Estoque insuficiente' } }),
-          prisma.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } }),
-        ]);
-        throw new AppError(400, 'Estoque insuficiente. Pagamento estornado automaticamente.');
-      }
-      return { data: { gatewayTxId, method } };
-    }
-
-    if (result.status === 'rejected') {
-      throw new AppError(400, CARD_REJECTION_MESSAGES[result.statusDetail ?? ''] ?? 'Pagamento recusado.');
-    }
+    return {
+      data: {
+        gatewayTxId,
+        method,
+        checkoutUrl: result.checkoutUrl,
+      },
+    };
   }
 
   const commission = (Number(order.totalAmount) * commissionPercent) / 100;
@@ -130,35 +132,150 @@ export async function initiatePayment(
   };
 }
 
-export async function handleOrderPaid(gatewayTxId: string) {
-  const payment = await prisma.payment.findFirst({ where: { gatewayTxId } });
-  if (!payment) return;
+async function resolveOrderForGatewayPayment(payment: any) {
+  const externalOrderId = payment?.external_reference?.toString() || payment?.metadata?.order_id?.toString();
 
-  const stockOk = await confirmOrderWithStockDecrement(payment.orderId);
+  if (externalOrderId) {
+    return prisma.order.findUnique({
+      where: { id: externalOrderId },
+      include: { store: true },
+    });
+  }
+
+  const existingPayment = await prisma.payment.findFirst({
+    where: { gatewayTxId: String(payment?.id || '') },
+    include: { order: { include: { store: true } } },
+  });
+
+  return existingPayment?.order || null;
+}
+
+function getMethodFromGatewayPayment(payment: any): 'PIX' | 'CREDIT_CARD' {
+  if (payment?.payment_method_id === 'pix' || payment?.payment_type_id === 'bank_transfer') {
+    return 'PIX';
+  }
+
+  return 'CREDIT_CARD';
+}
+
+async function upsertGatewayPaymentRecord(order: { id: string; totalAmount: any; store: { commissionRate: any } }, payment: any, status: 'PROCESSING' | 'FAILED') {
+  const commission = Number(order.totalAmount) * Number(order.store.commissionRate);
+  const netAmount = Number(order.totalAmount) - commission;
+
+  await prisma.payment.upsert({
+    where: { orderId: order.id },
+    update: {
+      method: getMethodFromGatewayPayment(payment),
+      gatewayTxId: String(payment.id),
+      grossAmount: order.totalAmount,
+      commission,
+      netAmount,
+      status,
+    },
+    create: {
+      orderId: order.id,
+      method: getMethodFromGatewayPayment(payment),
+      gatewayTxId: String(payment.id),
+      grossAmount: order.totalAmount,
+      commission,
+      netAmount,
+      status,
+    },
+  });
+}
+
+export async function handleOrderPaid(paymentOrGatewayTxId: any) {
+  const paymentData = typeof paymentOrGatewayTxId === 'string'
+    ? { id: paymentOrGatewayTxId }
+    : paymentOrGatewayTxId;
+
+  let order = await resolveOrderForGatewayPayment(paymentData);
+
+  if (!order && typeof paymentOrGatewayTxId === 'string') {
+    const existingPayment = await prisma.payment.findFirst({
+      where: { gatewayTxId: paymentOrGatewayTxId },
+      include: { order: { include: { store: true } } },
+    });
+    order = existingPayment?.order || null;
+  }
+
+  if (!order) return;
+
+  await upsertGatewayPaymentRecord(order, paymentData, 'PROCESSING');
+
+  const stockOk = await confirmOrderWithStockDecrement(order.id);
   if (!stockOk) {
-    try { await mp.refundPayment(payment.gatewayTxId); } catch (e) { console.error('Refund failed:', e); }
+    try { await mp.refundPayment(String(paymentData.id)); } catch (e) { console.error('Refund failed:', e); }
     await prisma.$transaction([
-      prisma.payment.update({ where: { orderId: payment.orderId }, data: { status: 'REFUNDED', refundReason: 'Estoque insuficiente' } }),
-      prisma.order.update({ where: { id: payment.orderId }, data: { status: 'CANCELLED' } }),
+      prisma.payment.update({ where: { orderId: order.id }, data: { status: 'REFUNDED', refundReason: 'Estoque insuficiente' } }),
+      prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } }),
     ]);
   }
 }
 
-export async function handlePaymentFailed(gatewayTxId: string) {
-  const payment = await prisma.payment.findFirst({ where: { gatewayTxId } });
-  if (!payment) return;
+export async function handlePaymentFailed(paymentOrGatewayTxId: any) {
+  const paymentData = typeof paymentOrGatewayTxId === 'string'
+    ? { id: paymentOrGatewayTxId }
+    : paymentOrGatewayTxId;
 
-  await prisma.$transaction([
-    prisma.payment.update({ where: { orderId: payment.orderId }, data: { status: 'FAILED' } }),
-    prisma.order.update({ where: { id: payment.orderId }, data: { status: 'CANCELLED' } }),
-  ]);
+  let order = await resolveOrderForGatewayPayment(paymentData);
+
+  if (!order && typeof paymentOrGatewayTxId === 'string') {
+    const existingPayment = await prisma.payment.findFirst({
+      where: { gatewayTxId: paymentOrGatewayTxId },
+      include: { order: { include: { store: true } } },
+    });
+    order = existingPayment?.order || null;
+  }
+
+  if (!order) return;
+
+  await upsertGatewayPaymentRecord(order, paymentData, 'FAILED');
+
+  if (order.status === 'PENDING') {
+    await prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } });
+  }
+}
+
+export async function syncPaymentStatus(orderId: string, paymentId: string, user: UserPayload) {
+  const order = await prisma.order.findUniqueOrThrow({
+    where: { id: orderId },
+    select: { id: true, buyerId: true },
+  });
+
+  if (order.buyerId !== user.id) throw new AppError(403, 'Acesso negado');
+
+  const payment = await mp.getPayment(paymentId);
+  const paymentOrderId = payment?.external_reference?.toString() || payment?.metadata?.order_id?.toString();
+
+  if (paymentOrderId && paymentOrderId !== orderId) {
+    throw new AppError(400, 'Pagamento não pertence a este pedido');
+  }
+
+  if (payment.status === 'approved') {
+    await handleOrderPaid(payment);
+  } else if (payment.status === 'rejected' || payment.status === 'cancelled') {
+    await handlePaymentFailed(payment);
+  }
+
+  return {
+    data: {
+      paymentId: String(payment.id),
+      status: payment.status as string,
+      statusDetail: payment.status_detail as string | undefined,
+    },
+  };
 }
 
 export async function getPaymentByOrder(orderId: string, user: UserPayload) {
-  const payment = await prisma.payment.findUniqueOrThrow({
+  const payment = await prisma.payment.findUnique({
     where: { orderId },
     include: { order: { select: { buyerId: true, store: { select: { ownerId: true } } } } },
   });
+
+  if (!payment) {
+    return { data: null };
+  }
 
   const isBuyer = payment.order.buyerId === user.id;
   const isSeller = payment.order.store.ownerId === user.id;

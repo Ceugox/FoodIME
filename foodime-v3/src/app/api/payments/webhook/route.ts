@@ -81,9 +81,9 @@ export async function POST(req: NextRequest) {
     const status = payment.status;
 
     if (status === 'approved') {
-      await handleOrderPaid(dataId);
+      await handleOrderPaid(payment);
     } else if (status === 'rejected' || status === 'cancelled') {
-      await handlePaymentFailed(dataId);
+      await handlePaymentFailed(payment);
     }
   } catch (e) {
     console.error('Webhook processing error:', e);

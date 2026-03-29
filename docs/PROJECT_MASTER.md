@@ -303,6 +303,7 @@ JWT_SECRET=
 JWT_REFRESH_SECRET=
 MERCADOPAGO_ACCESS_TOKEN=
 MERCADOPAGO_WEBHOOK_SECRET=
+MERCADOPAGO_TEST_PAYER_EMAIL=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_KEY=
@@ -332,15 +333,15 @@ GOOGLE_CLIENT_ID=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
-### 2026-03-28 — Hardening dos fluxos de auth e pagamento na V3
-**Problema:** A V3 já tinha backend para Google Auth e Mercado Pago, mas a UI ainda não expunha login com Google e o checkout de cartão permanecia em placeholder, impedindo entrega completa dos fluxos críticos.
-**Solução:** Adicionada integração de Google Auth nas telas de login e cadastro, provider OAuth no app, tokenização de cartão com chave pública do Mercado Pago no checkout e polling de pagamento após iniciar PIX/cartão. Também foram alinhados os exemplos de variáveis de ambiente para Google e email.
-**Arquivos:** `foodime-v3/src/app/providers.tsx`, `foodime-v3/src/components/common/google-auth-button.tsx`, `foodime-v3/src/lib/mercadopago-client.ts`, `foodime-v3/src/hooks/useAuth.ts`, `foodime-v3/src/app/(auth)/login/page.tsx`, `foodime-v3/src/app/(auth)/register/page.tsx`, `foodime-v3/src/app/(buyer)/checkout/[orderId]/page.tsx`, `foodime-v3/.env.example`, `docs/PROJECT_MASTER.md`
+### 2026-03-29 — Cartão migrado para Checkout Pro com retorno sincronizado
+**Problema:** O fluxo de cartão via Checkout API seguia instável no sandbox, com erros recorrentes de `Invalid users involved`, bloqueando a homologação e atrasando a entrega.
+**Solução:** O checkout com cartão da V3 foi migrado para Checkout Pro do Mercado Pago. O frontend agora redireciona o comprador para o checkout hospedado, o backend cria preferências com `external_reference`, e o retorno do Mercado Pago sincroniza o status do pagamento no pedido mesmo em ambiente local.
+**Arquivos:** `foodime-v3/src/app/(buyer)/checkout/[orderId]/page.tsx`, `foodime-v3/src/app/api/payments/sync/route.ts`, `foodime-v3/src/app/api/payments/webhook/route.ts`, `foodime-v3/src/hooks/useOrders.ts`, `foodime-v3/src/hooks/usePayment.ts`, `foodime-v3/src/lib/mercadopago.ts`, `foodime-v3/src/schemas/payments.ts`, `foodime-v3/src/services/payments.service.ts`, `docs/PROJECT_MASTER.md`
 
-### 2026-03-28 — Checklist operacional de go-live da V3
-**Problema:** A V3 já buildava localmente, mas ainda faltava uma revisão objetiva das variáveis obrigatórias e um roteiro curto de smoke test para publicação no mesmo dia.
-**Solução:** Foi criado um script de validação de envs da V3 e um checklist de go-live com ordem de validação pós-deploy para auth, Google, email, Mercado Pago, admin e loja.
-**Arquivos:** `foodime-v3/package.json`, `foodime-v3/scripts/check-env.mjs`, `docs/GO_LIVE_CHECKLIST.md`, `docs/PROJECT_MASTER.md`
+### 2026-03-29 — Credenciais locais apontadas para a aplicação de Checkout Pro
+**Problema:** Após migrar o fluxo de cartão para Checkout Pro, a V3 ainda estava com as credenciais antigas do Mercado Pago na `.env`, o que impediria validar o redirecionamento com a aplicação nova.
+**Solução:** A `.env` local foi atualizada para usar a public key e o access token da aplicação configurada para Checkout Pro, alinhando o ambiente de homologação ao fluxo novo.
+**Arquivos:** `foodime-v3/.env`, `docs/PROJECT_MASTER.md`
 
 
 ---

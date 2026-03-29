@@ -10,6 +10,13 @@ export function useInitiatePayment() {
   });
 }
 
+export function useSyncPayment() {
+  return useMutation({
+    mutationFn: (data: { orderId: string; paymentId: string }) =>
+      api<any>('/api/payments/sync', { method: 'POST', body: JSON.stringify(data) }),
+  });
+}
+
 export function usePaymentByOrder(orderId: string, enabled = true) {
   return useQuery({
     queryKey: ['payment', orderId],

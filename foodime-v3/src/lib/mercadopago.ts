@@ -41,6 +41,13 @@ interface CardPaymentParams {
   payerEmail: string;
 }
 
+interface CheckoutPreferenceParams {
+  orderId: string;
+  items: Array<{ title: string; quantity: number; unitPrice: number }>;
+  returnUrl: string;
+  notificationUrl?: string;
+}
+
 export async function createPixPayment(params: PixPaymentParams) {
   const response = await mpRequest<any>('POST', '/v1/payments', {
     transaction_amount: params.amount / 100,
@@ -72,6 +79,38 @@ export async function createCardPayment(params: CardPaymentParams) {
     id: String(response.id),
     status: response.status as string,
     statusDetail: response.status_detail as string | undefined,
+  };
+}
+
+export async function createCheckoutPreference(params: CheckoutPreferenceParams) {
+  const response = await mpRequest<any>('POST', '/checkout/preferences', {
+    items: params.items.map((item) => ({
+      title: item.title,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      currency_id: 'BRL',
+    })),
+    external_reference: params.orderId,
+    metadata: { order_id: params.orderId },
+    back_urls: {
+      success: params.returnUrl,
+      failure: params.returnUrl,
+      pending: params.returnUrl,
+    },
+    auto_return: 'approved',
+    payment_methods: {
+      excluded_payment_types: [
+        { id: 'ticket' },
+        { id: 'bank_transfer' },
+        { id: 'atm' },
+      ],
+    },
+    ...(params.notificationUrl ? { notification_url: params.notificationUrl } : {}),
+  }, params.orderId);
+
+  return {
+    id: String(response.id),
+    checkoutUrl: response.sandbox_init_point || response.init_point,
   };
 }
 

@@ -31,12 +31,13 @@ export function useSellerOrders() {
   });
 }
 
-export function useOrder(id: string) {
+export function useOrder(id: string, refetchInterval?: number | false) {
   return useQuery({
     queryKey: ['orders', id],
     queryFn: () => api<{ data: Order }>(`/api/orders/${id}`),
     select: (res) => res.data,
     enabled: !!id,
+    refetchInterval,
   });
 }
 

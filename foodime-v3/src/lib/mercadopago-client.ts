@@ -1,5 +1,6 @@
 'use client';
 
+import { loadMercadoPago } from '@mercadopago/sdk-js';
 import { ApiError } from '@/lib/api-client';
 
 export interface CardTokenData {
@@ -18,6 +19,22 @@ interface CardTokenResponse {
   cause?: Array<{ description?: string }>;
 }
 
+declare global {
+  interface Window {
+    MercadoPago?: new (publicKey: string, options?: { locale?: string }) => {
+      createCardToken: (params: {
+        cardNumber: string;
+        cardholderName: string;
+        cardExpirationMonth: string;
+        cardExpirationYear: string;
+        securityCode: string;
+        identificationType: string;
+        identificationNumber: string;
+      }) => Promise<CardTokenResponse>;
+    };
+  }
+}
+
 export async function createCardToken(cardData: CardTokenData): Promise<string> {
   const publicKey = process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY;
 
@@ -25,30 +42,24 @@ export async function createCardToken(cardData: CardTokenData): Promise<string> 
     throw new ApiError(500, 'Chave pública do Mercado Pago não configurada');
   }
 
-  const response = await fetch(
-    `https://api.mercadopago.com/v1/card_tokens?public_key=${publicKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        card_number: cardData.cardNumber,
-        cardholder: {
-          name: cardData.cardholderName,
-          identification: {
-            type: 'CPF',
-            number: cardData.identificationNumber,
-          },
-        },
-        expiration_month: Number(cardData.expirationMonth),
-        expiration_year: Number(`20${cardData.expirationYear}`),
-        security_code: cardData.securityCode,
-      }),
-    },
-  );
+  await loadMercadoPago();
 
-  const payload = (await response.json().catch(() => ({}))) as CardTokenResponse;
+  if (!window.MercadoPago) {
+    throw new ApiError(500, 'SDK do Mercado Pago não carregou corretamente');
+  }
 
-  if (!response.ok || !payload.id) {
+  const mp = new window.MercadoPago(publicKey, { locale: 'pt-BR' });
+  const payload = await mp.createCardToken({
+    cardNumber: cardData.cardNumber,
+    cardholderName: cardData.cardholderName,
+    cardExpirationMonth: cardData.expirationMonth,
+    cardExpirationYear: `20${cardData.expirationYear}`,
+    securityCode: cardData.securityCode,
+    identificationType: 'CPF',
+    identificationNumber: cardData.identificationNumber,
+  });
+
+  if (!payload.id) {
     const causeMessage = payload.cause?.find((item) => item.description)?.description;
     throw new ApiError(400, causeMessage || payload.message || payload.error || 'Falha ao tokenizar cartão');
   }

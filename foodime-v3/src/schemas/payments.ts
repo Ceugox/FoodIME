@@ -6,6 +6,11 @@ export const initiatePaymentSchema = z.object({
   cardToken: z.string().optional(),
 });
 
+export const syncPaymentSchema = z.object({
+  orderId: z.string().min(1),
+  paymentId: z.string().min(1),
+});
+
 export const validateCouponSchema = z.object({
   code: z.string().min(1).transform((v) => v.toUpperCase()),
 });
