@@ -4,13 +4,13 @@ import * as mp from '@/lib/mercadopago';
 import type { UserPayload } from '@/lib/jwt';
 
 function resolveMercadoPagoPayerEmail(email: string): string {
-  const sandboxEmail = process.env.MERCADOPAGO_TEST_PAYER_EMAIL?.trim();
-
-  if (sandboxEmail) {
-    return sandboxEmail;
+  // Never use test email in production — only applies in dev/test environments
+  if (process.env.NODE_ENV === 'production') {
+    return email;
   }
 
-  return email;
+  const sandboxEmail = process.env.MERCADOPAGO_TEST_PAYER_EMAIL?.trim();
+  return sandboxEmail || email;
 }
 
 async function confirmOrderWithStockDecrement(orderId: string): Promise<boolean> {
@@ -77,6 +77,8 @@ export async function initiatePayment(
   const amountInCents = Math.round(Number(order.totalAmount) * 100);
   const commissionPercent = Number(order.store.commissionRate) * 100;
   const payerEmail = resolveMercadoPagoPayerEmail(order.buyer.email);
+
+  console.log(`[payments] initiating ${method} for order ${orderId} | payer: ${payerEmail} | env: ${process.env.NODE_ENV}`);
 
   let gatewayTxId: string;
   let pixQrCode: string | null = null;

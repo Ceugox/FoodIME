@@ -20,7 +20,10 @@ async function mpRequest<T>(method: string, path: string, data?: unknown, idempo
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const msg = err.message || err.error || 'Erro MercadoPago';
+    const cause = err.cause ? ` | cause: ${JSON.stringify(err.cause)}` : '';
+    console.error(`[MP] ${method} ${path} → HTTP ${res.status}: ${msg}${cause}`);
     if (res.status === 400 || res.status === 422) throw new AppError(400, `MercadoPago: ${msg}`);
+    if (res.status === 401 || res.status === 403) throw new AppError(403, `MercadoPago: ${msg}`);
     if (res.status === 404) throw new AppError(404, `MercadoPago: ${msg}`);
     throw new AppError(500, `MercadoPago error: ${msg}`);
   }
