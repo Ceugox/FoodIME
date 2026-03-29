@@ -102,7 +102,6 @@ export async function createPixPreference(params: CheckoutPreferenceParams) {
     },
     auto_return: 'approved',
     payment_methods: {
-      default_payment_method_id: 'pix',
       excluded_payment_types: [
         { id: 'credit_card' },
         { id: 'debit_card' },

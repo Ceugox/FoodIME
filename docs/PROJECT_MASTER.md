@@ -333,15 +333,15 @@ GOOGLE_CLIENT_ID=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
-### 2026-03-29 — Build de produção ajustado para dependências nativas
-**Problema:** O build Docker da V3 passou a falhar ao coletar page data porque o `bcrypt` não encontrava `bcrypt_lib.node`, já que o `npm ci --ignore-scripts` impedia a instalação do binário nativo dentro da imagem.
-**Solução:** O `Dockerfile` da V3 passou a usar `node:20-bookworm-slim` em todas as stages e `npm ci` sem `--ignore-scripts`, permitindo instalar corretamente dependências nativas como `bcrypt` no ambiente do Railway.
-**Arquivos:** `foodime-v3/Dockerfile`, `docs/PROJECT_MASTER.md`
-
 ### 2026-03-29 — Docker build da V3 alinhado com Prisma no Railway
 **Problema:** Depois de corrigir `bcrypt`, o `npm ci` do container passou a falhar porque o `postinstall` do Prisma rodava antes do `schema.prisma` existir em `/app`, além do ambiente pedir OpenSSL explícito.
 **Solução:** O `Dockerfile` da V3 ganhou uma stage base com OpenSSL instalado e passou a usar `PRISMA_SKIP_POSTINSTALL_GENERATE=true` no `npm ci`, deixando o `npx prisma generate` para a stage de build, quando o código e o schema já estão copiados.
 **Arquivos:** `foodime-v3/Dockerfile`, `docs/PROJECT_MASTER.md`
+
+### 2026-03-29 — Corrigido erro "invalid default_payment_method_id" no PIX Checkout Pro
+**Problema:** Ao gerar QR Code PIX, a API do Mercado Pago retornava `invalid default_payment_method_id. The default payment method is excluded` porque a função `createPixPreference` definia `default_payment_method_id: 'pix'`, que não é aceito pela preferences API do Checkout Pro.
+**Solução:** Removido o campo `default_payment_method_id` de `createPixPreference`. Os tipos excluídos já garantem que somente PIX (bank_transfer) fica disponível.
+**Arquivos:** `foodime-v3/src/lib/mercadopago.ts`, `docs/PROJECT_MASTER.md`
 
 
 ---
