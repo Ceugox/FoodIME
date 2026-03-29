@@ -1,14 +1,14 @@
 # Stage 1: Install dependencies
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY foodime-v3/package.json foodime-v3/package-lock.json* ./
 RUN npm ci --ignore-scripts
 
 # Stage 2: Build
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY foodime-v3/ ./
 
 # Generate Prisma client
 RUN npx prisma generate

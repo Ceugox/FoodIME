@@ -333,15 +333,15 @@ GOOGLE_CLIENT_ID=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
-### 2026-03-29 — Cartão migrado para Checkout Pro com retorno sincronizado
-**Problema:** O fluxo de cartão via Checkout API seguia instável no sandbox, com erros recorrentes de `Invalid users involved`, bloqueando a homologação e atrasando a entrega.
-**Solução:** O checkout com cartão da V3 foi migrado para Checkout Pro do Mercado Pago. O frontend agora redireciona o comprador para o checkout hospedado, o backend cria preferências com `external_reference`, e o retorno do Mercado Pago sincroniza o status do pagamento no pedido mesmo em ambiente local.
-**Arquivos:** `foodime-v3/src/app/(buyer)/checkout/[orderId]/page.tsx`, `foodime-v3/src/app/api/payments/sync/route.ts`, `foodime-v3/src/app/api/payments/webhook/route.ts`, `foodime-v3/src/hooks/useOrders.ts`, `foodime-v3/src/hooks/usePayment.ts`, `foodime-v3/src/lib/mercadopago.ts`, `foodime-v3/src/schemas/payments.ts`, `foodime-v3/src/services/payments.service.ts`, `docs/PROJECT_MASTER.md`
-
 ### 2026-03-29 — Credenciais locais apontadas para a aplicação de Checkout Pro
 **Problema:** Após migrar o fluxo de cartão para Checkout Pro, a V3 ainda estava com as credenciais antigas do Mercado Pago na `.env`, o que impediria validar o redirecionamento com a aplicação nova.
 **Solução:** A `.env` local foi atualizada para usar a public key e o access token da aplicação configurada para Checkout Pro, alinhando o ambiente de homologação ao fluxo novo.
 **Arquivos:** `foodime-v3/.env`, `docs/PROJECT_MASTER.md`
+
+### 2026-03-29 — Dockerfile da V3 ajustado para build no contexto do monorepo
+**Problema:** O deploy no Railway falhou porque o `foodime-v3/Dockerfile` tentava copiar `package.json` da raiz do repositório, mas o build roda a partir do contexto do monorepo e os arquivos da V3 vivem em `foodime-v3/`.
+**Solução:** O `Dockerfile` passou a copiar explicitamente `foodime-v3/package.json`, `foodime-v3/package-lock.json` e o conteúdo de `foodime-v3/`, alinhando a imagem ao contexto real do build no Railway.
+**Arquivos:** `foodime-v3/Dockerfile`, `docs/PROJECT_MASTER.md`
 
 
 ---
