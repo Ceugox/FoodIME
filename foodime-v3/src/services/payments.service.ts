@@ -80,7 +80,9 @@ export async function initiatePayment(
 
   console.log(`[payments] initiating ${method} for order ${orderId} | payer: ${payerEmail} | env: ${process.env.NODE_ENV}`);
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const appUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
   const returnUrl = `${appUrl}/checkout/${orderId}`;
   const notificationUrl = /localhost|127\.0\.0\.1/.test(appUrl)
     ? undefined
