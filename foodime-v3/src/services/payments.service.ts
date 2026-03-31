@@ -1,17 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { AppError } from '@/lib/api/errors';
-import * as mp from '@/lib/mercadopago';
+import * as efi from '@/lib/efibank';
 import type { UserPayload } from '@/lib/jwt';
-
-function resolveMercadoPagoPayerEmail(email: string): string {
-  // Never use test email in production — only applies in dev/test environments
-  if (process.env.NODE_ENV === 'production') {
-    return email;
-  }
-
-  const sandboxEmail = process.env.MERCADOPAGO_TEST_PAYER_EMAIL?.trim();
-  return sandboxEmail || email;
-}
 
 async function confirmOrderWithStockDecrement(orderId: string): Promise<boolean> {
   let stockFailed = false;
@@ -56,13 +46,13 @@ export async function initiatePayment(
   orderId: string,
   method: 'PIX' | 'CREDIT_CARD',
   user: UserPayload,
-  _cardToken?: string,
+  cardHash?: string,
 ) {
   const order = await prisma.order.findUniqueOrThrow({
     where: { id: orderId },
     include: {
       store: true,
-      buyer: { select: { email: true } },
+      buyer: { select: { email: true, name: true, cpf: true, phone: true } },
       items: { include: { product: { select: { name: true } } } },
     },
   });
@@ -75,146 +65,138 @@ export async function initiatePayment(
   if (existing) throw new AppError(409, 'Já existe um pagamento ativo para este pedido');
 
   const amountInCents = Math.round(Number(order.totalAmount) * 100);
-  const commissionPercent = Number(order.store.commissionRate) * 100;
-  const payerEmail = resolveMercadoPagoPayerEmail(order.buyer.email);
-
-  console.log(`[payments] initiating ${method} for order ${orderId} | payer: ${payerEmail} | env: ${process.env.NODE_ENV}`);
-
-  const appUrl = process.env.RAILWAY_PUBLIC_DOMAIN
-    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-    : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
-  const returnUrl = `${appUrl}/checkout/${orderId}`;
-  const notificationUrl = /localhost|127\.0\.0\.1/.test(appUrl)
-    ? undefined
-    : `${appUrl}/api/payments/webhook`;
-
-  const items = order.items.map((item) => ({
-    title: item.product.name,
-    quantity: item.quantity,
-    unitPrice: Number(item.priceAtPurchase),
-  }));
-
-  if (method === 'PIX') {
-    const result = await mp.createPixPreference({ orderId, items, returnUrl, notificationUrl });
-    return { data: { gatewayTxId: result.id, method, checkoutUrl: result.checkoutUrl } };
-  }
-
-  const result = await mp.createCheckoutPreference({ orderId, items, returnUrl, notificationUrl });
-  return {
-    data: {
-      gatewayTxId: result.id,
-      method,
-      checkoutUrl: result.checkoutUrl,
-    },
-  };
-}
-
-async function resolveOrderForGatewayPayment(payment: any) {
-  const externalOrderId = payment?.external_reference?.toString() || payment?.metadata?.order_id?.toString();
-
-  if (externalOrderId) {
-    return prisma.order.findUnique({
-      where: { id: externalOrderId },
-      include: { store: true },
-    });
-  }
-
-  const existingPayment = await prisma.payment.findFirst({
-    where: { gatewayTxId: String(payment?.id || '') },
-    include: { order: { include: { store: true } } },
-  });
-
-  return existingPayment?.order || null;
-}
-
-function getMethodFromGatewayPayment(payment: any): 'PIX' | 'CREDIT_CARD' {
-  if (payment?.payment_method_id === 'pix' || payment?.payment_type_id === 'bank_transfer') {
-    return 'PIX';
-  }
-
-  return 'CREDIT_CARD';
-}
-
-async function upsertGatewayPaymentRecord(order: { id: string; totalAmount: any; store: { commissionRate: any } }, payment: any, status: 'PROCESSING' | 'FAILED') {
   const commission = Number(order.totalAmount) * Number(order.store.commissionRate);
   const netAmount = Number(order.totalAmount) - commission;
 
-  await prisma.payment.upsert({
-    where: { orderId: order.id },
-    update: {
-      method: getMethodFromGatewayPayment(payment),
-      gatewayTxId: String(payment.id),
-      grossAmount: order.totalAmount,
-      commission,
-      netAmount,
-      status,
-    },
-    create: {
-      orderId: order.id,
-      method: getMethodFromGatewayPayment(payment),
-      gatewayTxId: String(payment.id),
-      grossAmount: order.totalAmount,
-      commission,
-      netAmount,
-      status,
-    },
-  });
-}
+  console.log(`[payments] initiating ${method} for order ${orderId} | amount: R$${(amountInCents / 100).toFixed(2)}`);
 
-export async function handleOrderPaid(paymentOrGatewayTxId: any) {
-  const paymentData = typeof paymentOrGatewayTxId === 'string'
-    ? { id: paymentOrGatewayTxId }
-    : paymentOrGatewayTxId;
-
-  let order = await resolveOrderForGatewayPayment(paymentData);
-
-  if (!order && typeof paymentOrGatewayTxId === 'string') {
-    const existingPayment = await prisma.payment.findFirst({
-      where: { gatewayTxId: paymentOrGatewayTxId },
-      include: { order: { include: { store: true } } },
+  if (method === 'PIX') {
+    const result = await efi.createPixCharge({
+      amount: amountInCents,
+      orderId,
+      orderCode: order.code,
     });
-    order = existingPayment?.order || null;
+
+    // Store payment record so webhook can look it up by gatewayTxId
+    await prisma.payment.create({
+      data: {
+        orderId,
+        method: 'PIX',
+        gatewayTxId: result.txid,
+        grossAmount: order.totalAmount,
+        commission,
+        netAmount,
+        status: 'PROCESSING',
+      },
+    });
+
+    return {
+      data: {
+        gatewayTxId: result.txid,
+        method,
+        pixCopiaECola: result.pixCopiaECola,
+        qrCodeBase64: result.qrCodeBase64,
+      },
+    };
   }
 
-  if (!order) return;
+  // CREDIT_CARD
+  if (!cardHash) throw new AppError(400, 'Token do cartão é obrigatório');
 
-  await upsertGatewayPaymentRecord(order, paymentData, 'PROCESSING');
+  const buyer = order.buyer;
+  if (!buyer.cpf) throw new AppError(400, 'CPF do comprador é obrigatório para pagamento com cartão');
 
+  const result = await efi.createCardCharge({
+    amount: amountInCents,
+    orderId,
+    cardHash,
+    orderCode: order.code,
+    customer: {
+      name: buyer.name,
+      email: buyer.email,
+      cpf: buyer.cpf,
+      phone: buyer.phone || '21999999999',
+    },
+  });
+
+  // Store payment record
+  await prisma.payment.create({
+    data: {
+      orderId,
+      method: 'CREDIT_CARD',
+      gatewayTxId: result.chargeId,
+      grossAmount: order.totalAmount,
+      commission,
+      netAmount,
+      status: 'PROCESSING',
+    },
+  });
+
+  if (result.status === 'approved') {
+    await handleOrderPaid(result.chargeId, 'CREDIT_CARD');
+    return { data: { gatewayTxId: result.chargeId, method, status: 'approved' } };
+  }
+
+  // Rejected / failed immediately
+  await prisma.payment.update({
+    where: { orderId },
+    data: { status: 'FAILED' },
+  });
+  throw new AppError(400, 'Pagamento com cartão não aprovado. Verifique os dados e tente novamente.');
+}
+
+export async function handleOrderPaid(gatewayTxId: string, method?: 'PIX' | 'CREDIT_CARD') {
+  const payment = await prisma.payment.findFirst({
+    where: { gatewayTxId },
+    include: { order: { include: { store: true } } },
+  });
+
+  if (!payment) {
+    console.warn(`[payments] handleOrderPaid: no payment found for gatewayTxId ${gatewayTxId}`);
+    return;
+  }
+
+  const order = payment.order;
   const stockOk = await confirmOrderWithStockDecrement(order.id);
+
   if (!stockOk) {
-    try { await mp.refundPayment(String(paymentData.id)); } catch (e) { console.error('Refund failed:', e); }
+    const paymentMethod = method || payment.method;
+    try {
+      if (paymentMethod === 'PIX') {
+        await efi.refundPix(gatewayTxId, Math.round(Number(order.totalAmount) * 100));
+      } else {
+        await efi.refundCard(gatewayTxId);
+      }
+    } catch (e) {
+      console.error('[payments] Refund failed:', e);
+    }
+
     await prisma.$transaction([
-      prisma.payment.update({ where: { orderId: order.id }, data: { status: 'REFUNDED', refundReason: 'Estoque insuficiente' } }),
+      prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'REFUNDED', refundReason: 'Estoque insuficiente' },
+      }),
       prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } }),
     ]);
   }
 }
 
-export async function handlePaymentFailed(paymentOrGatewayTxId: any) {
-  const paymentData = typeof paymentOrGatewayTxId === 'string'
-    ? { id: paymentOrGatewayTxId }
-    : paymentOrGatewayTxId;
+export async function handlePaymentFailed(gatewayTxId: string) {
+  const payment = await prisma.payment.findFirst({
+    where: { gatewayTxId },
+    include: { order: true },
+  });
 
-  let order = await resolveOrderForGatewayPayment(paymentData);
+  if (!payment) return;
 
-  if (!order && typeof paymentOrGatewayTxId === 'string') {
-    const existingPayment = await prisma.payment.findFirst({
-      where: { gatewayTxId: paymentOrGatewayTxId },
-      include: { order: { include: { store: true } } },
-    });
-    order = existingPayment?.order || null;
-  }
+  await prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } });
 
-  if (!order) return;
-
-  await upsertGatewayPaymentRecord(order, paymentData, 'FAILED');
-
-  if (order.status === 'PENDING') {
-    await prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } });
+  if (payment.order.status === 'PENDING') {
+    await prisma.order.update({ where: { id: payment.orderId }, data: { status: 'CANCELLED' } });
   }
 }
 
-export async function syncPaymentStatus(orderId: string, paymentId: string, user: UserPayload) {
+export async function syncPaymentStatus(orderId: string, txid: string, user: UserPayload) {
   const order = await prisma.order.findUniqueOrThrow({
     where: { id: orderId },
     select: { id: true, buyerId: true },
@@ -222,24 +204,16 @@ export async function syncPaymentStatus(orderId: string, paymentId: string, user
 
   if (order.buyerId !== user.id) throw new AppError(403, 'Acesso negado');
 
-  const payment = await mp.getPayment(paymentId);
-  const paymentOrderId = payment?.external_reference?.toString() || payment?.metadata?.order_id?.toString();
+  const charge = await efi.getPixCharge(txid);
 
-  if (paymentOrderId && paymentOrderId !== orderId) {
-    throw new AppError(400, 'Pagamento não pertence a este pedido');
-  }
-
-  if (payment.status === 'approved') {
-    await handleOrderPaid(payment);
-  } else if (payment.status === 'rejected' || payment.status === 'cancelled') {
-    await handlePaymentFailed(payment);
+  if (charge.status === 'CONCLUIDA') {
+    await handleOrderPaid(txid, 'PIX');
   }
 
   return {
     data: {
-      paymentId: String(payment.id),
-      status: payment.status as string,
-      statusDetail: payment.status_detail as string | undefined,
+      txid: charge.txid,
+      status: charge.status,
     },
   };
 }

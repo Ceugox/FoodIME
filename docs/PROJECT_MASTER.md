@@ -61,10 +61,11 @@ Marketplace de comida para faculdades, começando pelo IME (Instituto Militar de
 - **App mobile legado:** Expo EAS Build
 
 ### Gateway de Pagamento
-- **Plataforma:** Mercado Pago
+- **Plataforma:** Efí Bank (migrado do Mercado Pago em 2026-03-31)
 - **Modelo:** Pagamento direto (sem split) — todo dinheiro cai na conta da empresa, admin repassa vendedores manualmente
-- **Métodos:** Pix (QR Code dinâmico) e Cartão de Crédito
+- **Métodos:** Pix (QR Code dinâmico direto no app, sem redirect) e Cartão de Crédito (formulário nativo)
 - **Comissão:** calculada por `store.commissionRate` e registrada no Payment para controle do admin
+- **Nota mTLS:** PIX API em produção requer certificados. Configurar `EFI_CERT_BASE64` + `EFI_KEY_BASE64` e ajustar agent no `efibank.ts`
 
 ---
 
@@ -301,9 +302,11 @@ DATABASE_URL=
 DIRECT_URL=
 JWT_SECRET=
 JWT_REFRESH_SECRET=
-MERCADOPAGO_ACCESS_TOKEN=
-MERCADOPAGO_WEBHOOK_SECRET=
-MERCADOPAGO_TEST_PAYER_EMAIL=
+EFI_CLIENT_ID=
+EFI_CLIENT_SECRET=
+EFI_PIX_KEY=
+EFI_SANDBOX=true
+NEXT_PUBLIC_EFI_PAYEE_CODE=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_KEY=
@@ -321,8 +324,8 @@ GOOGLE_CLIENT_ID=
 
 ## 11. Decisões de Segurança
 
-- Webhook Mercado Pago: validar header `x-signature` com HMAC-SHA256 antes de qualquer processamento; sempre consultar GET /v1/payments/:id para confirmar status real
-- Cartão salvo: armazenar apenas token do Mercado Pago SDK, nunca dados de cartão
+- Webhook Efí Bank: validar txid no DB antes de processar (sandwich de segurança); em produção usar mTLS para autenticar chamadas do gateway
+- Cartão salvo: armazenar apenas payment_token gerado pelo efipay-js SDK, nunca dados de cartão brutos
 - Admin: rotas `/admin/*` vivem no mesmo app da V3, protegidas por middleware e checagem de role ADMIN
 - RLS Supabase: toda tabela com RLS habilitado — vendedor só lê/edita seus próprios produtos e pedidos, comprador só lê seus próprios pedidos
 - Tokens JWT: access token com expiração curta (15min), refresh token com expiração longa (7 dias) armazenados em cookies HTTP-only + tabela `RefreshToken`
@@ -338,10 +341,10 @@ GOOGLE_CLIENT_ID=
 **Solução:** O `Dockerfile` da V3 ganhou uma stage base com OpenSSL instalado e passou a usar `PRISMA_SKIP_POSTINSTALL_GENERATE=true` no `npm ci`, deixando o `npx prisma generate` para a stage de build, quando o código e o schema já estão copiados.
 **Arquivos:** `foodime-v3/Dockerfile`, `docs/PROJECT_MASTER.md`
 
-### 2026-03-29 — Corrigido erro "invalid default_payment_method_id" no PIX Checkout Pro
-**Problema:** Ao gerar QR Code PIX, a API do Mercado Pago retornava `invalid default_payment_method_id. The default payment method is excluded` porque a função `createPixPreference` definia `default_payment_method_id: 'pix'`, que não é aceito pela preferences API do Checkout Pro.
-**Solução:** Removido o campo `default_payment_method_id` de `createPixPreference`. Os tipos excluídos já garantem que somente PIX (bank_transfer) fica disponível.
-**Arquivos:** `foodime-v3/src/lib/mercadopago.ts`, `docs/PROJECT_MASTER.md`
+### 2026-03-31 — Migração Mercado Pago → Efí Bank
+**Problema:** Sandbox do MP instável e UX ruim (redirect externo para PIX e cartão).
+**Solução:** Gateway de pagamento trocado por Efí Bank. PIX agora exibe QR code direto no app (sem redirect). Cartão tem formulário nativo com tokenização via efipay-js CDN. OAuth com cache de token, deduplica de webhook via DB. `cpf` adicionado ao User para pagamentos de cartão.
+**Arquivos:** `foodime-v3/src/lib/efibank.ts` (NOVO), `foodime-v3/src/lib/efibank-client.ts` (NOVO), `foodime-v3/src/services/payments.service.ts`, `foodime-v3/src/app/api/payments/webhook/route.ts`, `foodime-v3/src/app/(buyer)/checkout/[orderId]/page.tsx`, `foodime-v3/src/schemas/payments.ts`, `foodime-v3/src/hooks/usePayment.ts`, `foodime-v3/prisma/schema.prisma`, `foodime-v3/.env.example`; REMOVIDOS: `mercadopago.ts`, `mercadopago-client.ts`
 
 
 ---

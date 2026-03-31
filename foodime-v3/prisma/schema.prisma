@@ -23,6 +23,7 @@ model User {
   googleId                String?        @unique
   passwordResetToken      String?        @unique
   passwordResetExpiry     DateTime?
+  cpf                     String?
   pushToken               String?
   deletedAt               DateTime?
   store                   Store?

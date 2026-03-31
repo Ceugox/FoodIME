@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const initiatePaymentSchema = z.object({
   orderId: z.string().min(1),
   method: z.enum(['PIX', 'CREDIT_CARD']),
-  cardToken: z.string().optional(),
+  cardHash: z.string().optional(),
 });
 
 export const syncPaymentSchema = z.object({

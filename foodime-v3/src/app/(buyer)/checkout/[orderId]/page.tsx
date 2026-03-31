@@ -1,37 +1,55 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useOrder } from '@/hooks/useOrders';
-import { useInitiatePayment, useSyncPayment } from '@/hooks/usePayment';
+import { useInitiatePayment } from '@/hooks/usePayment';
 import { useCartStore } from '@/store/cartStore';
 import { toast } from '@/components/common/toast';
 import { PIX_EXPIRY_MINUTES } from '@/lib/constants';
 
 type Tab = 'PIX' | 'CARD';
 
+interface CardForm {
+  number: string;
+  name: string;
+  expMonth: string;
+  expYear: string;
+  cvv: string;
+  cpf: string;
+}
+
+const EMPTY_CARD: CardForm = { number: '', name: '', expMonth: '', expYear: '', cvv: '', cpf: '' };
+
+function formatCardNumber(v: string) {
+  return v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
+}
+
+function formatCpf(v: string) {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+    .replace(/(\d{3})(\d{3})(\d{0,3})/, '$1.$2.$3')
+    .replace(/(\d{3})(\d{0,3})/, '$1.$2');
+}
+
 export default function CheckoutPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const clear = useCartStore((s) => s.clear);
   const initiate = useInitiatePayment();
-  const syncPayment = useSyncPayment();
 
   const [tab, setTab] = useState<Tab>('PIX');
   const [pixData, setPixData] = useState<{ qrCode: string; qrCodeBase64: string } | null>(null);
   const [pixExpiry, setPixExpiry] = useState<Date | null>(null);
   const [countdown, setCountdown] = useState('');
   const [paymentStarted, setPaymentStarted] = useState(false);
-  const [syncedPaymentId, setSyncedPaymentId] = useState<string | null>(null);
+  const [cardForm, setCardForm] = useState<CardForm>(EMPTY_CARD);
+  const [cardLoading, setCardLoading] = useState(false);
 
-  const paymentId = searchParams.get('payment_id') || searchParams.get('collection_id');
-  const mercadoPagoStatus = searchParams.get('status') || searchParams.get('collection_status');
-  const shouldPoll = paymentStarted || !!paymentId;
-  const { data: order } = useOrder(orderId, shouldPoll ? 3000 : false);
-
+  const { data: order } = useOrder(orderId, paymentStarted ? 3000 : false);
   const isPaid = order?.status === 'PAID' || order?.status === 'READY' || order?.status === 'PICKED_UP';
 
+  // Redirect when order is paid
   useEffect(() => {
     if (isPaid) {
       clear();
@@ -40,6 +58,7 @@ export default function CheckoutPage() {
     }
   }, [isPaid, clear, router]);
 
+  // PIX countdown
   useEffect(() => {
     if (!pixExpiry) return;
     const interval = setInterval(() => {
@@ -56,71 +75,50 @@ export default function CheckoutPage() {
     return () => clearInterval(interval);
   }, [pixExpiry]);
 
-  useEffect(() => {
-    if (!paymentId || syncedPaymentId === paymentId) return;
-
-    setSyncedPaymentId(paymentId);
-    setPaymentStarted(true);
-
-    syncPayment.mutate(
-      { orderId, paymentId },
-      {
-        onSuccess: (result) => {
-          const status = result?.data?.status;
-          if (status === 'approved') {
-            toast({ title: 'Pagamento aprovado pelo Mercado Pago. Confirmando pedido...', variant: 'success' });
-          } else if (status === 'pending' || status === 'in_process') {
-            toast({ title: 'Pagamento recebido. Aguardando confirmação final...', variant: 'success' });
-          } else if (status === 'rejected' || status === 'cancelled') {
-            toast({ title: 'Pagamento não aprovado pelo Mercado Pago', variant: 'error' });
-          }
-        },
-        onError: (err: any) => {
-          toast({ title: err?.message || 'Erro ao sincronizar pagamento', variant: 'error' });
-        },
-      },
-    );
-  }, [orderId, paymentId, syncPayment, syncedPaymentId]);
-
-  useEffect(() => {
-    if (!mercadoPagoStatus || paymentId) return;
-
-    if (mercadoPagoStatus === 'approved' || mercadoPagoStatus === 'pending' || mercadoPagoStatus === 'in_process') {
-      setPaymentStarted(true);
-      toast({ title: 'Voltamos do Mercado Pago. Confirmando pagamento...', variant: 'success' });
-      return;
-    }
-
-    if (mercadoPagoStatus === 'rejected' || mercadoPagoStatus === 'cancelled' || mercadoPagoStatus === 'failure') {
-      toast({ title: 'Pagamento não aprovado pelo Mercado Pago', variant: 'error' });
-    }
-  }, [mercadoPagoStatus, paymentId]);
-
   const handlePixPayment = useCallback(async () => {
     try {
       const result = await initiate.mutateAsync({ orderId, method: 'PIX' });
-      const checkoutUrl = result?.data?.checkoutUrl;
-      if (!checkoutUrl) throw new Error('Checkout PIX indisponível');
-      window.location.href = checkoutUrl;
+      const { pixCopiaECola, qrCodeBase64 } = result?.data ?? {};
+      if (!pixCopiaECola) throw new Error('PIX indisponível — tente novamente');
+      setPixData({ qrCode: pixCopiaECola, qrCodeBase64: qrCodeBase64 || '' });
+      setPixExpiry(new Date(Date.now() + PIX_EXPIRY_MINUTES * 60 * 1000));
+      setPaymentStarted(true);
     } catch (err: any) {
       toast({ title: err?.message || 'Erro ao gerar PIX', variant: 'error' });
     }
   }, [orderId, initiate]);
 
   const handleCardPayment = useCallback(async () => {
-    try {
-      const result = await initiate.mutateAsync({ orderId, method: 'CREDIT_CARD' });
-      const checkoutUrl = result?.data?.checkoutUrl;
-
-      if (!checkoutUrl) {
-        throw new Error('Checkout do Mercado Pago indisponível');
-      }
-
-      window.location.href = checkoutUrl;
-    } catch (err: any) {
-      toast({ title: err?.message || 'Erro ao iniciar checkout com cartão', variant: 'error' });
+    if (!cardForm.number || !cardForm.name || !cardForm.expMonth || !cardForm.expYear || !cardForm.cvv || !cardForm.cpf) {
+      toast({ title: 'Preencha todos os campos do cartão', variant: 'error' });
+      return;
     }
-  }, [initiate, orderId]);
+
+    setCardLoading(true);
+    try {
+      // Dynamic import to avoid loading SDK unless needed
+      const { getCardHash } = await import('@/lib/efibank-client');
+      const cardHash = await getCardHash({
+        cardNumber: cardForm.number,
+        cardholderName: cardForm.name,
+        expirationMonth: cardForm.expMonth,
+        expirationYear: cardForm.expYear,
+        securityCode: cardForm.cvv,
+      });
+
+      const result = await initiate.mutateAsync({ orderId, method: 'CREDIT_CARD', cardHash });
+      const status = result?.data?.status;
+
+      if (status === 'approved') {
+        setPaymentStarted(true);
+        toast({ title: 'Cartão aprovado! Confirmando pedido...', variant: 'success' });
+      }
+    } catch (err: any) {
+      toast({ title: err?.message || 'Pagamento com cartão recusado', variant: 'error' });
+    } finally {
+      setCardLoading(false);
+    }
+  }, [cardForm, orderId, initiate]);
 
   const copyPixCode = useCallback(async () => {
     if (!pixData?.qrCode) return;
@@ -131,6 +129,9 @@ export default function CheckoutPage() {
       toast({ title: 'Erro ao copiar', variant: 'error' });
     }
   }, [pixData]);
+
+  const setField = (field: keyof CardForm, value: string) =>
+    setCardForm((prev) => ({ ...prev, [field]: value }));
 
   if (!order) {
     return (
@@ -159,21 +160,23 @@ export default function CheckoutPage() {
       <h1 className="text-xl font-serif text-text mb-1">Pagamento</h1>
       <p className="text-text-muted text-xs mb-6">Pedido #{order.code} — R$ {Number(order.totalAmount).toFixed(2)}</p>
 
+      {/* Tab switcher */}
       <div className="flex gap-2 mb-6">
         {(['PIX', 'CARD'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            disabled={!!pixData}
+            disabled={!!pixData || paymentStarted}
             className={`flex-1 h-11 rounded-xl text-sm font-semibold transition-all ${
               tab === t ? 'bg-primary text-white' : 'bg-surface border border-border text-text-secondary'
-            } ${pixData ? 'opacity-60 cursor-not-allowed' : ''}`}
+            } ${pixData || paymentStarted ? 'opacity-60 cursor-not-allowed' : ''}`}
           >
             {t === 'PIX' ? 'PIX' : 'Cartão de Crédito'}
           </button>
         ))}
       </div>
 
+      {/* PIX — before generating */}
       {tab === 'PIX' && !pixData && (
         <div className="bg-surface rounded-2xl border border-border p-6 text-center">
           <div className="w-16 h-16 bg-primary/10 rounded-2xl mx-auto mb-4 flex items-center justify-center">
@@ -193,6 +196,7 @@ export default function CheckoutPage() {
         </div>
       )}
 
+      {/* PIX — QR code shown */}
       {tab === 'PIX' && pixData && (
         <div className="bg-surface rounded-2xl border border-border p-6 text-center">
           <div className="mb-4">
@@ -224,35 +228,104 @@ export default function CheckoutPage() {
         </div>
       )}
 
+      {/* Card form */}
       {tab === 'CARD' && (
         <div className="bg-surface rounded-2xl border border-border p-6">
-          <div className="rounded-xl bg-background border border-border p-4 mb-4">
-            <p className="text-sm font-semibold text-text mb-2">Pagamento seguro pelo Mercado Pago</p>
-            <p className="text-xs text-text-muted leading-relaxed">
-              Ao continuar, você será redirecionado para o checkout hospedado do Mercado Pago para finalizar o
-              pagamento com cartão. Depois disso, você volta automaticamente para esta tela e o pedido é sincronizado.
-            </p>
-          </div>
+          <p className="text-sm font-semibold text-text mb-4">Dados do cartão</p>
 
-          {mercadoPagoStatus && !isPaid && (
-            <div className="rounded-xl border border-border bg-background p-4 mb-4">
-              <p className="text-xs font-semibold text-text-secondary mb-1">Retorno do Mercado Pago</p>
-              <p className="text-sm text-text">
-                Status atual: <span className="font-semibold">{mercadoPagoStatus}</span>
-              </p>
+          <div className="space-y-3">
+            {/* Card number */}
+            <div>
+              <label className="text-xs text-text-muted mb-1 block">Número do cartão</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={cardForm.number}
+                onChange={(e) => setField('number', formatCardNumber(e.target.value))}
+                placeholder="0000 0000 0000 0000"
+                maxLength={19}
+                className="w-full h-11 bg-background border border-border rounded-xl px-4 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+              />
             </div>
-          )}
+
+            {/* Cardholder name */}
+            <div>
+              <label className="text-xs text-text-muted mb-1 block">Nome no cartão</label>
+              <input
+                type="text"
+                value={cardForm.name}
+                onChange={(e) => setField('name', e.target.value.toUpperCase())}
+                placeholder="NOME COMO NO CARTÃO"
+                className="w-full h-11 bg-background border border-border rounded-xl px-4 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+              />
+            </div>
+
+            {/* Expiry + CVV */}
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="text-xs text-text-muted mb-1 block">Mês</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={cardForm.expMonth}
+                  onChange={(e) => setField('expMonth', e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  placeholder="MM"
+                  maxLength={2}
+                  className="w-full h-11 bg-background border border-border rounded-xl px-4 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-text-muted mb-1 block">Ano</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={cardForm.expYear}
+                  onChange={(e) => setField('expYear', e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="AAAA"
+                  maxLength={4}
+                  className="w-full h-11 bg-background border border-border rounded-xl px-4 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-text-muted mb-1 block">CVV</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={cardForm.cvv}
+                  onChange={(e) => setField('cvv', e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="123"
+                  maxLength={4}
+                  className="w-full h-11 bg-background border border-border rounded-xl px-4 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+
+            {/* CPF */}
+            <div>
+              <label className="text-xs text-text-muted mb-1 block">CPF do titular</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={cardForm.cpf}
+                onChange={(e) => setField('cpf', formatCpf(e.target.value))}
+                placeholder="000.000.000-00"
+                maxLength={14}
+                className="w-full h-11 bg-background border border-border rounded-xl px-4 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+              />
+            </div>
+          </div>
 
           <button
             onClick={handleCardPayment}
-            disabled={initiate.isPending || syncPayment.isPending}
+            disabled={cardLoading || initiate.isPending}
             className="w-full h-12 bg-primary text-white rounded-xl font-semibold text-sm mt-6 disabled:opacity-60"
           >
-            {initiate.isPending || syncPayment.isPending ? 'Processando...' : 'Pagar com cartão no Mercado Pago'}
+            {cardLoading || initiate.isPending ? 'Processando...' : 'Pagar com cartão'}
           </button>
         </div>
       )}
 
+      {/* Order summary */}
       <div className="mt-6 bg-surface rounded-xl border border-border p-4">
         <p className="text-xs text-text-secondary font-semibold mb-2">Resumo do pedido</p>
         {order.items?.map((item: any) => (

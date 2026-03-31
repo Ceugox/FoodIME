@@ -3,9 +3,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 
+// PIX response:  { data: { gatewayTxId, method, pixCopiaECola, qrCodeBase64 } }
+// Card response: { data: { gatewayTxId, method, status } }
 export function useInitiatePayment() {
   return useMutation({
-    mutationFn: (data: { orderId: string; method: 'PIX' | 'CREDIT_CARD'; cardToken?: string }) =>
+    mutationFn: (data: { orderId: string; method: 'PIX' | 'CREDIT_CARD'; cardHash?: string }) =>
       api<any>('/api/payments/initiate', { method: 'POST', body: JSON.stringify(data) }),
   });
 }
