@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { QRCodeSVG } from 'qrcode.react';
 import { useOrder } from '@/hooks/useOrders';
 import { useInitiatePayment } from '@/hooks/usePayment';
 import { useCartStore } from '@/store/cartStore';
@@ -104,6 +105,7 @@ export default function CheckoutPage() {
         expirationMonth: cardForm.expMonth,
         expirationYear: cardForm.expYear,
         securityCode: cardForm.cvv,
+        holderDocument: cardForm.cpf.replace(/\D/g, ''),
       });
 
       const result = await initiate.mutateAsync({ orderId, method: 'CREDIT_CARD', cardHash });
@@ -204,9 +206,9 @@ export default function CheckoutPage() {
             <p className={`text-lg font-bold ${countdown === 'Expirado' ? 'text-error' : 'text-accent'}`}>{countdown}</p>
           </div>
 
-          {pixData.qrCodeBase64 && (
+          {pixData.qrCode && (
             <div className="bg-white rounded-xl p-4 inline-block mb-4">
-              <img src={`data:image/png;base64,${pixData.qrCodeBase64}`} alt="QR Code PIX" className="w-48 h-48" />
+              <QRCodeSVG value={pixData.qrCode} size={192} />
             </div>
           )}
 

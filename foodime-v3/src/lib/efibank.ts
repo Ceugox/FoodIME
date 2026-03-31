@@ -1,3 +1,5 @@
+import https from 'https';
+import { URL } from 'url';
 import { AppError } from '@/lib/api/errors';
 
 const EFI_SANDBOX = process.env.EFI_SANDBOX === 'true';
@@ -9,6 +11,73 @@ const PIX_BASE_URL = EFI_SANDBOX
 const COBRANCAS_BASE_URL = EFI_SANDBOX
   ? 'https://cobrancas-h.api.efipay.com.br'
   : 'https://cobrancas.api.efipay.com.br';
+
+// ─── mTLS agent (required by Efí PIX API in both sandbox and production) ─────
+
+function buildPixAgent(): https.Agent {
+  const cert64 = process.env.EFI_CERT_BASE64;
+  const key64 = process.env.EFI_KEY_BASE64;
+  if (cert64 && key64) {
+    return new https.Agent({
+      cert: Buffer.from(cert64, 'base64').toString('utf-8'),
+      key: Buffer.from(key64, 'base64').toString('utf-8'),
+      rejectUnauthorized: true,
+    });
+  }
+  // No certificate configured — will fail on real mTLS endpoints
+  return new https.Agent();
+}
+
+const pixAgent = buildPixAgent();
+
+// Promise-based wrapper around https.request (supports https.Agent with mTLS)
+async function httpsRequest<T>(
+  method: string,
+  urlStr: string,
+  headers: Record<string, string>,
+  body?: unknown,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(urlStr);
+    const bodyStr = body ? JSON.stringify(body) : undefined;
+    const reqHeaders: Record<string, string> = {
+      ...headers,
+      'Content-Type': 'application/json',
+      ...(bodyStr ? { 'Content-Length': Buffer.byteLength(bodyStr).toString() } : {}),
+    };
+
+    const req = https.request(
+      {
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: url.pathname + url.search,
+        method,
+        headers: reqHeaders,
+        agent: url.hostname.includes('pix') ? pixAgent : undefined,
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          try {
+            const parsed = data ? JSON.parse(data) : {};
+            if (res.statusCode && res.statusCode >= 400) {
+              reject({ status: res.statusCode, body: parsed });
+            } else {
+              resolve(parsed as T);
+            }
+          } catch {
+            reject({ status: res.statusCode, body: data });
+          }
+        });
+      },
+    );
+
+    req.on('error', reject);
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
+}
 
 // ─── OAuth token cache ───────────────────────────────────────────────────────
 
@@ -24,21 +93,14 @@ async function getPixAccessToken(): Promise<string> {
     `${process.env.EFI_CLIENT_ID}:${process.env.EFI_CLIENT_SECRET}`,
   ).toString('base64');
 
-  const res = await fetch(`${PIX_BASE_URL}/oauth/token`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${credentials}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ grant_type: 'client_credentials' }),
-  });
+  const data = await httpsRequest<any>('POST', `${PIX_BASE_URL}/oauth/token`, {
+    Authorization: `Basic ${credentials}`,
+  }, { grant_type: 'client_credentials' });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new AppError(500, `Efí PIX OAuth failed: ${err.error || res.status}`);
+  if (!data.access_token) {
+    throw new AppError(500, `Efí PIX OAuth failed: ${data.error || 'no token'}`);
   }
 
-  const data = await res.json();
   pixTokenCache = {
     token: data.access_token,
     expiresAt: Date.now() + (data.expires_in - 60) * 1000,
@@ -81,26 +143,19 @@ async function getCobrancasAccessToken(): Promise<string> {
 
 async function pixRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = await getPixAccessToken();
-  const res = await fetch(`${PIX_BASE_URL}${path}`, {
-    method,
-    headers: {
+  try {
+    return await httpsRequest<T>(method, `${PIX_BASE_URL}${path}`, {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg = err.mensagem || err.message || `HTTP ${res.status}`;
-    console.error(`[Efí PIX] ${method} ${path} → ${res.status}: ${msg}`);
-    if (res.status === 400 || res.status === 422) throw new AppError(400, `Efí PIX: ${msg}`);
-    if (res.status === 401 || res.status === 403) throw new AppError(403, `Efí PIX: ${msg}`);
-    if (res.status === 404) throw new AppError(404, `Efí PIX: ${msg}`);
+    }, body);
+  } catch (err: any) {
+    const status: number = err?.status ?? 500;
+    const msg: string = err?.body?.mensagem || err?.body?.message || `HTTP ${status}`;
+    console.error(`[Efí PIX] ${method} ${path} → ${status}: ${msg}`, JSON.stringify(err?.body));
+    if (status === 400 || status === 422) throw new AppError(400, `Efí PIX: ${msg}`);
+    if (status === 401 || status === 403) throw new AppError(403, `Efí PIX: ${msg}`);
+    if (status === 404) throw new AppError(404, `Efí PIX: ${msg}`);
     throw new AppError(500, `Efí PIX error: ${msg}`);
   }
-
-  return res.json();
 }
 
 // ─── Cobranças helpers ───────────────────────────────────────────────────────
@@ -157,22 +212,18 @@ export async function createPixCharge(params: {
   };
 
   const charge = await pixRequest<any>('PUT', `/v2/cob/${txid}`, chargeBody);
-  const locId: number = charge.loc?.id;
+  // GET the charge to retrieve pixCopiaECola
+  const chargeDetails = await pixRequest<any>('GET', `/v2/cob/${txid}`);
+  const pixCopiaECola: string = chargeDetails.pixCopiaECola || '';
 
-  if (!locId) {
-    throw new AppError(500, 'Efí PIX: loc.id não retornado');
+  if (!pixCopiaECola) {
+    throw new AppError(500, 'Efí PIX: pixCopiaECola não retornado');
   }
 
-  const qrData = await pixRequest<any>('GET', `/v2/loc/${locId}/qrcode`);
-
-  // imagemQrcode may come as "data:image/png;base64,<b64>" — strip prefix for <img>
-  const raw: string = qrData.imagemQrcode || '';
-  const qrCodeBase64 = raw.startsWith('data:') ? raw.split(',')[1] ?? '' : raw;
-
+  // QR code image is rendered client-side from pixCopiaECola (via qrcode.react)
   return {
     txid,
-    pixCopiaECola: qrData.qrcode as string,
-    qrCodeBase64,
+    pixCopiaECola,
   };
 }
 

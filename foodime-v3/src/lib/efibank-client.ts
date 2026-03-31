@@ -2,23 +2,30 @@
 
 import { ApiError } from '@/lib/api-client';
 
-// Efí Bank JS SDK loaded via CDN
-// SDK docs: https://dev.efipay.com.br/docs/pagamentos/cartao
-// CDN URL: https://js.efipay.com.br/v1/js (or legacy https://js.gerencianet.com.br/v1)
-const EFI_SDK_URL = 'https://js.efipay.com.br/v1/js';
+// Efí Bank JS SDK — payment-token-efi (npm package, served via jsDelivr CDN)
+// https://github.com/efipay/js-payment-token-efi
+const EFI_SDK_URL = 'https://cdn.jsdelivr.net/npm/payment-token-efi/dist/payment-token-efi-umd.min.js';
+const EFI_ENVIRONMENT = process.env.NEXT_PUBLIC_EFI_SANDBOX === 'true' ? 'sandbox' : 'production';
 
 declare global {
   interface Window {
-    EfipayJs?: {
-      setAccount: (payeeCode: string) => void;
-      getPaymentToken: (cardData: {
-        brand: string;
-        number: string;
-        cvv: string;
-        expiration_month: string;
-        expiration_year: string;
-        reuse: boolean;
-      }) => Promise<{ payment_token: string; card_mask: string }>;
+    EfiPay?: {
+      CreditCard: {
+        setAccount: (payeeCode: string) => Window['EfiPay']['CreditCard'];
+        setEnvironment: (env: 'production' | 'sandbox') => Window['EfiPay']['CreditCard'];
+        setCreditCardData: (data: {
+          brand: string;
+          number: string;
+          cvv: string;
+          expirationMonth: string;
+          expirationYear: string;
+          holderName: string;
+          holderDocument?: string;
+        }) => Window['EfiPay']['CreditCard'];
+        getPaymentToken: () => Promise<{ payment_token: string; card_mask: string }>;
+        setCardNumber: (number: string) => Window['EfiPay']['CreditCard'];
+        verifyCardBrand: () => Promise<{ brand: string }>;
+      };
     };
   }
 }
@@ -34,13 +41,12 @@ function detectBrand(cardNumber: string): string {
   return 'visa'; // default fallback
 }
 
-async function loadEfipayJs(): Promise<void> {
-  if (window.EfipayJs) return;
+async function loadEfiPaySdk(): Promise<void> {
+  if (window.EfiPay) return;
 
   return new Promise((resolve, reject) => {
     const existing = document.querySelector(`script[src="${EFI_SDK_URL}"]`);
     if (existing) {
-      // Script already loading — wait for it
       existing.addEventListener('load', () => resolve());
       existing.addEventListener('error', () => reject(new Error('Falha ao carregar SDK Efí')));
       return;
@@ -61,28 +67,34 @@ export async function getCardHash(cardData: {
   expirationMonth: string;
   expirationYear: string;
   securityCode: string;
+  holderDocument?: string;
 }): Promise<string> {
-  const payeeCode = process.env.NEXT_PUBLIC_EFI_PAYEE_CODE;
-  if (!payeeCode) {
-    throw new ApiError(500, 'NEXT_PUBLIC_EFI_PAYEE_CODE não configurado');
+  // NEXT_PUBLIC_EFI_ACCOUNT_ID = "Identificador de Conta" found at
+  // Efí Bank panel → API → Introdução → Identificador de conta
+  const accountId = process.env.NEXT_PUBLIC_EFI_ACCOUNT_ID || process.env.NEXT_PUBLIC_EFI_PAYEE_CODE;
+  if (!accountId) {
+    throw new ApiError(500, 'NEXT_PUBLIC_EFI_ACCOUNT_ID não configurado');
   }
 
-  await loadEfipayJs();
+  await loadEfiPaySdk();
 
-  if (!window.EfipayJs) {
+  if (!window.EfiPay) {
     throw new ApiError(500, 'SDK Efí não carregou corretamente');
   }
 
-  window.EfipayJs.setAccount(payeeCode);
-
-  const result = await window.EfipayJs.getPaymentToken({
-    brand: detectBrand(cardData.cardNumber),
-    number: cardData.cardNumber.replace(/\s/g, ''),
-    cvv: cardData.securityCode,
-    expiration_month: cardData.expirationMonth,
-    expiration_year: cardData.expirationYear,
-    reuse: false,
-  });
+  const result = await window.EfiPay.CreditCard
+    .setAccount(accountId)
+    .setEnvironment(EFI_ENVIRONMENT as 'production' | 'sandbox')
+    .setCreditCardData({
+      brand: detectBrand(cardData.cardNumber),
+      number: cardData.cardNumber.replace(/\s/g, ''),
+      cvv: cardData.securityCode,
+      expirationMonth: cardData.expirationMonth,
+      expirationYear: cardData.expirationYear,
+      holderName: cardData.cardholderName,
+      holderDocument: cardData.holderDocument,
+    })
+    .getPaymentToken();
 
   if (!result?.payment_token) {
     throw new ApiError(400, 'Falha ao tokenizar cartão com Efí');

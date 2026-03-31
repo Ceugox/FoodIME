@@ -336,15 +336,15 @@ GOOGLE_CLIENT_ID=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
-### 2026-03-29 — Docker build da V3 alinhado com Prisma no Railway
-**Problema:** Depois de corrigir `bcrypt`, o `npm ci` do container passou a falhar porque o `postinstall` do Prisma rodava antes do `schema.prisma` existir em `/app`, além do ambiente pedir OpenSSL explícito.
-**Solução:** O `Dockerfile` da V3 ganhou uma stage base com OpenSSL instalado e passou a usar `PRISMA_SKIP_POSTINSTALL_GENERATE=true` no `npm ci`, deixando o `npx prisma generate` para a stage de build, quando o código e o schema já estão copiados.
-**Arquivos:** `foodime-v3/Dockerfile`, `docs/PROJECT_MASTER.md`
+### 2026-03-31 — QR Code client-side + SDK cartão + testes completos PIX/Cartão ✅
+**Problema:** CDN antiga `js.efipay.com.br/v1/js` inexistente; scope `payloadlocation.read` indisponível na Efí.
+**Solução:** (1) QR Code gerado client-side via `qrcode.react` a partir do `pixCopiaECola` — sem chamada à API da Efí, sem dependência de scope. (2) `efibank-client.ts` migrado para `payment-token-efi` (jsDelivr) com API fluent `EfiPay.CreditCard`. (3) `NEXT_PUBLIC_EFI_ACCOUNT_ID` = Identificador de Conta (painel Efí → API → Introdução). **PIX:** charge → QR Code SVG + copy-paste → webhook → PAID ✅. **Cartão:** tokenização → `POST /v1/charge/one-step` → approved → PAID ✅.
+**Arquivos:** `foodime-v3/src/lib/efibank.ts`, `foodime-v3/src/lib/efibank-client.ts`, `foodime-v3/src/services/payments.service.ts`, `foodime-v3/src/app/(buyer)/checkout/[orderId]/page.tsx`, `foodime-v3/.env`
 
-### 2026-03-31 — Migração Mercado Pago → Efí Bank
-**Problema:** Sandbox do MP instável e UX ruim (redirect externo para PIX e cartão).
-**Solução:** Gateway de pagamento trocado por Efí Bank. PIX agora exibe QR code direto no app (sem redirect). Cartão tem formulário nativo com tokenização via efipay-js CDN. OAuth com cache de token, deduplica de webhook via DB. `cpf` adicionado ao User para pagamentos de cartão.
-**Arquivos:** `foodime-v3/src/lib/efibank.ts` (NOVO), `foodime-v3/src/lib/efibank-client.ts` (NOVO), `foodime-v3/src/services/payments.service.ts`, `foodime-v3/src/app/api/payments/webhook/route.ts`, `foodime-v3/src/app/(buyer)/checkout/[orderId]/page.tsx`, `foodime-v3/src/schemas/payments.ts`, `foodime-v3/src/hooks/usePayment.ts`, `foodime-v3/prisma/schema.prisma`, `foodime-v3/.env.example`; REMOVIDOS: `mercadopago.ts`, `mercadopago-client.ts`
+### 2026-03-31 — Migração Mercado Pago → Efí Bank + mTLS + PIX + Cartão testados
+**Problema:** Sandbox do MP instável. API PIX da Efí exige mTLS mesmo em homologação.
+**Solução:** Gateway trocado para Efí Bank. `efibank.ts` reescrito para usar `https.Agent` com certificado `.p12`. `pixCopiaECola` obtido via `GET /v2/cob/:txid`. CPF (`User.cpf`) adicionado ao schema. **Scopes habilitados:** `cob.write`, `cob.read`, `pix.write` (Enviar Pix — estornos PIX automáticos habilitados). **Pendente:** `payloadlocation.read` para imagem QR (copy-paste já funciona).
+**Arquivos:** `foodime-v3/src/lib/efibank.ts`, `foodime-v3/.env`
 
 
 ---

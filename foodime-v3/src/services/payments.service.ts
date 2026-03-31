@@ -95,7 +95,6 @@ export async function initiatePayment(
         gatewayTxId: result.txid,
         method,
         pixCopiaECola: result.pixCopiaECola,
-        qrCodeBase64: result.qrCodeBase64,
       },
     };
   }
