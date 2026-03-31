@@ -7,25 +7,27 @@ import { ApiError } from '@/lib/api-client';
 const EFI_SDK_URL = 'https://cdn.jsdelivr.net/npm/payment-token-efi/dist/payment-token-efi-umd.min.js';
 const EFI_ENVIRONMENT = process.env.NEXT_PUBLIC_EFI_SANDBOX === 'true' ? 'sandbox' : 'production';
 
+interface EfiCreditCard {
+  setAccount: (payeeCode: string) => EfiCreditCard;
+  setEnvironment: (env: 'production' | 'sandbox') => EfiCreditCard;
+  setCreditCardData: (data: {
+    brand: string;
+    number: string;
+    cvv: string;
+    expirationMonth: string;
+    expirationYear: string;
+    holderName: string;
+    holderDocument?: string;
+  }) => EfiCreditCard;
+  getPaymentToken: () => Promise<{ payment_token: string; card_mask: string }>;
+  setCardNumber: (number: string) => EfiCreditCard;
+  verifyCardBrand: () => Promise<{ brand: string }>;
+}
+
 declare global {
   interface Window {
     EfiPay?: {
-      CreditCard: {
-        setAccount: (payeeCode: string) => Window['EfiPay']['CreditCard'];
-        setEnvironment: (env: 'production' | 'sandbox') => Window['EfiPay']['CreditCard'];
-        setCreditCardData: (data: {
-          brand: string;
-          number: string;
-          cvv: string;
-          expirationMonth: string;
-          expirationYear: string;
-          holderName: string;
-          holderDocument?: string;
-        }) => Window['EfiPay']['CreditCard'];
-        getPaymentToken: () => Promise<{ payment_token: string; card_mask: string }>;
-        setCardNumber: (number: string) => Window['EfiPay']['CreditCard'];
-        verifyCardBrand: () => Promise<{ brand: string }>;
-      };
+      CreditCard: EfiCreditCard;
     };
   }
 }
