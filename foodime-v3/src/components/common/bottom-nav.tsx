@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useCartStore } from '@/store/cartStore';
 
 interface NavItem {
   label: string;
@@ -10,10 +11,11 @@ interface NavItem {
 }
 
 export function BuyerNav() {
+  const itemCount = useCartStore((s) => s.getItemCount());
   const items: NavItem[] = [
     { label: 'Início', href: '/home', icon: <HomeIcon /> },
     { label: 'Pedidos', href: '/orders', icon: <OrdersIcon /> },
-    { label: 'Carrinho', href: '/cart', icon: <CartIcon /> },
+    { label: 'Carrinho', href: '/cart', icon: <CartIconWithBadge count={itemCount} /> },
     { label: 'Perfil', href: '/profile', icon: <ProfileIcon /> },
   ];
   return <BottomNav items={items} />;
@@ -69,11 +71,18 @@ function OrdersIcon() {
     </svg>
   );
 }
-function CartIcon() {
+function CartIconWithBadge({ count }: { count: number }) {
   return (
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-6 h-6">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-    </svg>
+    <span className="relative w-6 h-6 flex items-center justify-center">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-6 h-6">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+      </svg>
+      {count > 0 && (
+        <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-white rounded-full text-[9px] font-bold flex items-center justify-center leading-none">
+          {count > 9 ? '9+' : count}
+        </span>
+      )}
+    </span>
   );
 }
 function ProfileIcon() {

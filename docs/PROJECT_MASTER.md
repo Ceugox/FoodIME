@@ -336,15 +336,15 @@ GOOGLE_CLIENT_ID=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
-### 2026-03-31 — QR Code client-side + SDK cartão + testes completos PIX/Cartão ✅
-**Problema:** CDN antiga `js.efipay.com.br/v1/js` inexistente; scope `payloadlocation.read` indisponível na Efí.
-**Solução:** (1) QR Code gerado client-side via `qrcode.react` a partir do `pixCopiaECola` — sem chamada à API da Efí, sem dependência de scope. (2) `efibank-client.ts` migrado para `payment-token-efi` (jsDelivr) com API fluent `EfiPay.CreditCard`. (3) `NEXT_PUBLIC_EFI_ACCOUNT_ID` = Identificador de Conta (painel Efí → API → Introdução). **PIX:** charge → QR Code SVG + copy-paste → webhook → PAID ✅. **Cartão:** tokenização → `POST /v1/charge/one-step` → approved → PAID ✅.
-**Arquivos:** `foodime-v3/src/lib/efibank.ts`, `foodime-v3/src/lib/efibank-client.ts`, `foodime-v3/src/services/payments.service.ts`, `foodime-v3/src/app/(buyer)/checkout/[orderId]/page.tsx`, `foodime-v3/.env`
+### 2026-04-08 — Playwright E2E 25/25 passando
+**Problema:** 7 testes falhando: (1) strict mode em `reset-password` e `verify-email` (`getByText` ambíguo). (2) Login com credenciais erradas: API client fazia redirect para `/login` ao receber 401 (tentativa de refresh não mockada → `window.location.href = '/login'`). (3) Rota `/api/orders/buyer` sobrescrita pelo wildcard `/api/orders/**` por LIFO no Playwright. (4) Profile não mostrava nome do usuário: `useAuthStore` lê do Zustand localStorage, não da API — cookie injection não bastava.
+**Solução:** (1) Seletores → `getByRole('heading', ...)`. (2) Adicionado mock de `/api/auth/refresh` retornando 200 para que o retry do login rode corretamente e lance `ApiError` (em vez de redirecionar). (3) Invertida ordem de registro das rotas de orders (wildcard primeiro, específico depois). (4) `page.addInitScript()` para semear `auth-storage` no localStorage antes da navegação.
+**Arquivos:** `foodime-v3/e2e/fixtures.ts`, `foodime-v3/e2e/auth-flow.spec.ts`
 
-### 2026-03-31 — Migração Mercado Pago → Efí Bank + mTLS + PIX + Cartão testados
-**Problema:** Sandbox do MP instável. API PIX da Efí exige mTLS mesmo em homologação.
-**Solução:** Gateway trocado para Efí Bank. `efibank.ts` reescrito para usar `https.Agent` com certificado `.p12`. `pixCopiaECola` obtido via `GET /v2/cob/:txid`. CPF (`User.cpf`) adicionado ao schema. **Scopes habilitados:** `cob.write`, `cob.read`, `pix.write` (Enviar Pix — estornos PIX automáticos habilitados). **Pendente:** `payloadlocation.read` para imagem QR (copy-paste já funciona).
-**Arquivos:** `foodime-v3/src/lib/efibank.ts`, `foodime-v3/.env`
+### 2026-04-08 — Design upgrades + Playwright E2E (setup)
+**Problema:** Home sem personalização, nav sem badge de carrinho, profile sem stats, orders sem step tracker. Sem testes E2E.
+**Solução:** (1) Home: greeting personalizado, chips de categoria filtráveis, badge "Aberta agora" destacado. (2) BuyerNav: badge com contagem de itens no ícone do carrinho. (3) Profile: cards de resumo (total pedidos, total gasto) e atalho para histórico. (4) Orders: tabs Ativo/Todos, step tracker visual com checkmarks para pedidos ativos. (5) Playwright: `@playwright/test` instalado, `playwright.config.ts`, `e2e/buyer-flow.spec.ts`, `e2e/auth-flow.spec.ts`, `e2e/fixtures.ts`.
+**Arquivos:** `foodime-v3/src/app/(buyer)/home/page.tsx`, `foodime-v3/src/components/common/bottom-nav.tsx`, `foodime-v3/src/app/(buyer)/profile/page.tsx`, `foodime-v3/src/app/(buyer)/orders/page.tsx`, `foodime-v3/playwright.config.ts`, `foodime-v3/e2e/`
 
 
 ---
