@@ -23,9 +23,18 @@ jobs:
         with:
           node-version: 20
 
+      - name: Run Prisma migrations
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: foodime-v3
+        run: |
+          npm ci
+          npx prisma migrate deploy
+
       - name: Deploy FoodIME V3 to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           npm i -g @railway/cli
-          railway up --service backend
+          railway up --service laudable-dedication

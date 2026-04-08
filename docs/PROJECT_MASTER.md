@@ -296,17 +296,21 @@ CONFIRMAÇÃO (transação Prisma atômica):
 
 ## 10. Variáveis de Ambiente
 
-### FoodIME V3 (.env)
+### FoodIME V3 (.env local)
 ```
-DATABASE_URL=
-DIRECT_URL=
+DATABASE_URL=          # Supabase pooler (port 6543, ?pgbouncer=true)
+DIRECT_URL=            # Supabase direct (port 5432) — migrations only
 JWT_SECRET=
 JWT_REFRESH_SECRET=
 EFI_CLIENT_ID=
 EFI_CLIENT_SECRET=
-EFI_PIX_KEY=
-EFI_SANDBOX=true
-NEXT_PUBLIC_EFI_PAYEE_CODE=
+EFI_PIX_KEY=           # Chave Pix cadastrada na conta Efí
+EFI_SANDBOX=true       # false em produção
+EFI_CERT_BASE64=       # mTLS cert (produção PIX obrigatório)
+EFI_KEY_BASE64=        # mTLS key (produção PIX obrigatório)
+NEXT_PUBLIC_EFI_PAYEE_CODE=    # ex: "896145-1"
+NEXT_PUBLIC_EFI_ACCOUNT_ID=    # Identificador de Conta (painel Efí → API → Introdução)
+NEXT_PUBLIC_EFI_SANDBOX=true   # false em produção
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_KEY=
@@ -315,8 +319,59 @@ CRON_SECRET=
 GMAIL_USER=
 GMAIL_APP_PASSWORD=
 EMAIL_FROM=
-GOOGLE_CLIENT_ID=
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=
 ```
+
+### Railway — Variáveis de Ambiente de Produção
+Configurar em Railway → Service → Variables:
+
+| Variável | Descrição |
+|---|---|
+| `DATABASE_URL` | Supabase pooler (port 6543, `?pgbouncer=true`) |
+| `DIRECT_URL` | Supabase direct (port 5432) — usado por migrate deploy |
+| `JWT_SECRET` | Segredo JWT (min 32 chars) |
+| `JWT_REFRESH_SECRET` | Segredo refresh token (min 32 chars) |
+| `EFI_CLIENT_ID` | Client ID Efí Bank produção |
+| `EFI_CLIENT_SECRET` | Client Secret Efí Bank produção |
+| `EFI_PIX_KEY` | Chave Pix (CPF/CNPJ/email/aleatória) |
+| `EFI_SANDBOX` | `false` |
+| `EFI_CERT_BASE64` | Certificado mTLS em base64 (produção PIX) |
+| `EFI_KEY_BASE64` | Chave privada mTLS em base64 (produção PIX) |
+| `NEXT_PUBLIC_EFI_PAYEE_CODE` | Código do beneficiário (ex: `896145-1`) |
+| `NEXT_PUBLIC_EFI_ACCOUNT_ID` | Identificador de Conta Efí |
+| `NEXT_PUBLIC_EFI_SANDBOX` | `false` |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL do projeto Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key pública |
+| `SUPABASE_SERVICE_KEY` | Service role key (nunca expor ao cliente) |
+| `NEXT_PUBLIC_APP_URL` | URL do Railway (ex: `https://foodime.up.railway.app`) |
+| `CRON_SECRET` | Token para autenticar cron jobs |
+| `GMAIL_USER` | Email para envio de notificações |
+| `GMAIL_APP_PASSWORD` | App Password do Gmail |
+| `EMAIL_FROM` | Remetente de emails |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | OAuth Google (opcional) |
+
+### GitHub Secrets (para CI/CD)
+Configurar em GitHub → Settings → Secrets → Actions:
+
+| Secret | Descrição |
+|---|---|
+| `RAILWAY_TOKEN` | Token Railway para deploy via CLI |
+| `DATABASE_URL` | Igual ao Railway (para `prisma migrate deploy`) |
+| `DIRECT_URL` | Supabase direct (port 5432) — migrations |
+| `JWT_SECRET` | Igual ao Railway |
+| `JWT_REFRESH_SECRET` | Igual ao Railway |
+| `EFI_CLIENT_ID` | Igual ao Railway |
+| `EFI_CLIENT_SECRET` | Igual ao Railway |
+| `EFI_PIX_KEY` | Igual ao Railway |
+| `EFI_CERT_BASE64` | Igual ao Railway |
+| `EFI_KEY_BASE64` | Igual ao Railway |
+| `NEXT_PUBLIC_EFI_PAYEE_CODE` | Igual ao Railway |
+| `NEXT_PUBLIC_EFI_ACCOUNT_ID` | Igual ao Railway |
+| `NEXT_PUBLIC_EFI_SANDBOX` | `false` |
+| `SUPABASE_SERVICE_KEY` | Igual ao Railway |
+| `NEXT_PUBLIC_SUPABASE_URL` | Igual ao Railway |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Igual ao Railway |
+| `CRON_SECRET` | Igual ao Railway |
 
 **Legado:** os `.env` de `backend/`, `web/`, `admin/` e `mobile/` ficam apenas para referência histórica.
 
@@ -336,15 +391,15 @@ GOOGLE_CLIENT_ID=
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
+### 2026-04-08 — CI/CD + Produção Railway
+**Problema:** CI quebrado com vars MercadoPago. `railway up --service backend` (nome errado). Sem `prisma migrate deploy` no pipeline. Health check sem ping real ao banco. Vars de ambiente não documentadas para Railway/GitHub Secrets.
+**Solução:** (1) `foodime-v3.yml`: removidas vars MP, adicionadas vars Efí dummy no build, step `prisma migrate deploy` no job deploy, service name corrigido para `laudable-dedication`. (2) `deploy.yml`: mesmo fix de nome + step de migrate. (3) `Dockerfile`: copia `node_modules/prisma` + `start.sh`; CMD usa `sh start.sh`. (4) `start.sh`: roda `prisma migrate deploy` antes de `node server.js`. (5) `health/route.ts`: `SELECT 1` no banco, retorna 503 se DB inacessível. (6) `PROJECT_MASTER.md` seção 10: tabelas de Railway vars + GitHub Secrets.
+**Arquivos:** `.github/workflows/foodime-v3.yml`, `.github/workflows/deploy.yml`, `foodime-v3/Dockerfile`, `foodime-v3/start.sh`, `foodime-v3/src/app/api/health/route.ts`, `docs/PROJECT_MASTER.md`
+
 ### 2026-04-08 — Playwright E2E 25/25 passando
 **Problema:** 7 testes falhando: (1) strict mode em `reset-password` e `verify-email` (`getByText` ambíguo). (2) Login com credenciais erradas: API client fazia redirect para `/login` ao receber 401 (tentativa de refresh não mockada → `window.location.href = '/login'`). (3) Rota `/api/orders/buyer` sobrescrita pelo wildcard `/api/orders/**` por LIFO no Playwright. (4) Profile não mostrava nome do usuário: `useAuthStore` lê do Zustand localStorage, não da API — cookie injection não bastava.
 **Solução:** (1) Seletores → `getByRole('heading', ...)`. (2) Adicionado mock de `/api/auth/refresh` retornando 200 para que o retry do login rode corretamente e lance `ApiError` (em vez de redirecionar). (3) Invertida ordem de registro das rotas de orders (wildcard primeiro, específico depois). (4) `page.addInitScript()` para semear `auth-storage` no localStorage antes da navegação.
 **Arquivos:** `foodime-v3/e2e/fixtures.ts`, `foodime-v3/e2e/auth-flow.spec.ts`
-
-### 2026-04-08 — Design upgrades + Playwright E2E (setup)
-**Problema:** Home sem personalização, nav sem badge de carrinho, profile sem stats, orders sem step tracker. Sem testes E2E.
-**Solução:** (1) Home: greeting personalizado, chips de categoria filtráveis, badge "Aberta agora" destacado. (2) BuyerNav: badge com contagem de itens no ícone do carrinho. (3) Profile: cards de resumo (total pedidos, total gasto) e atalho para histórico. (4) Orders: tabs Ativo/Todos, step tracker visual com checkmarks para pedidos ativos. (5) Playwright: `@playwright/test` instalado, `playwright.config.ts`, `e2e/buyer-flow.spec.ts`, `e2e/auth-flow.spec.ts`, `e2e/fixtures.ts`.
-**Arquivos:** `foodime-v3/src/app/(buyer)/home/page.tsx`, `foodime-v3/src/components/common/bottom-nav.tsx`, `foodime-v3/src/app/(buyer)/profile/page.tsx`, `foodime-v3/src/app/(buyer)/orders/page.tsx`, `foodime-v3/playwright.config.ts`, `foodime-v3/e2e/`
 
 
 ---

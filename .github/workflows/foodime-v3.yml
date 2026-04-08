@@ -43,10 +43,15 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres?pgbouncer=true
           DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres
-          JWT_SECRET: test-secret-min-32-chars-for-ci
-          JWT_REFRESH_SECRET: test-refresh-secret-min-32-chars
-          MERCADOPAGO_ACCESS_TOKEN: TEST-ACCESS-TOKEN
-          MERCADOPAGO_WEBHOOK_SECRET: test-webhook-secret
+          JWT_SECRET: test-secret-min-32-chars-for-ci-00
+          JWT_REFRESH_SECRET: test-refresh-secret-min-32-chars-00
+          EFI_CLIENT_ID: test-efi-client-id
+          EFI_CLIENT_SECRET: test-efi-client-secret
+          EFI_PIX_KEY: 00000000-0000-0000-0000-000000000000
+          EFI_SANDBOX: true
+          NEXT_PUBLIC_EFI_PAYEE_CODE: 000000-0
+          NEXT_PUBLIC_EFI_ACCOUNT_ID: test-account-id
+          NEXT_PUBLIC_EFI_SANDBOX: true
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
           SUPABASE_SERVICE_KEY: test-service-key
@@ -66,9 +71,18 @@ jobs:
         with:
           node-version: 20
 
+      - name: Run Prisma migrations
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: foodime-v3
+        run: |
+          npm ci
+          npx prisma migrate deploy
+
       - name: Deploy to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           npm i -g @railway/cli
-          railway up --service backend
+          railway up --service laudable-dedication
