@@ -16,7 +16,16 @@ const TEST_CARD = {
   cpf: '942.715.646-56',
 };
 
+// Teste não hermético: depende de banco populado (usuário marcelo@foodime.com, loja com
+// produto em estoque) e de credenciais reais do sandbox da Efí. Fica fora da suíte padrão.
+const RUN_LIVE_PAYMENT_TESTS = process.env.RUN_LIVE_PAYMENT_TESTS === 'true';
+
 test('credit card payment end-to-end', async ({ page }) => {
+  test.skip(
+    !RUN_LIVE_PAYMENT_TESTS,
+    'Requer banco ativo e sandbox Efí. Rode com RUN_LIVE_PAYMENT_TESTS=true',
+  );
+
   // ── 1. Login ────────────────────────────────────────────────────────────
   await page.goto('/login');
   await page.getByPlaceholder('seu@email.com').fill('marcelo@foodime.com');

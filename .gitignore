@@ -36,6 +36,13 @@ npm-debug.log*
 # Playwright MCP screenshots & logs
 .playwright-mcp/
 
+# Playwright artifacts
+playwright-report/
+test-results/
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
 # Root-level screenshots (test artifacts)
 /*.png
 

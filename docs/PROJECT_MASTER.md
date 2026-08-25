@@ -39,7 +39,7 @@ Marketplace de comida para faculdades, começando pelo IME (Instituto Militar de
 - **App:** `foodime-v3/`
 - **Framework:** Next.js 15 (App Router + Route Handlers)
 - **Linguagem:** TypeScript
-- **UI:** React 19 + Tailwind CSS + PWA (`next-pwa`)
+- **UI:** React 19 + Tailwind CSS. O `manifest.json` continua servindo o app como instalável, mas o `next-pwa` foi removido em 2026-08-25 (não acompanha o Next 15) — não há service worker, então a página `/offline` está inativa
 - **Estado global:** Zustand
 - **Cache/fetching:** TanStack Query
 - **ORM:** Prisma
@@ -379,11 +379,15 @@ Configurar em GitHub → Settings → Secrets → Actions:
 
 ## 11. Decisões de Segurança
 
-- Webhook Efí Bank: validar txid no DB antes de processar (sandwich de segurança); em produção usar mTLS para autenticar chamadas do gateway
+- Webhook Efí Bank: o payload nunca é fonte de verdade. O fluxo é txid existe no DB → pagamento ainda não liquidado → consulta `GET /v2/cob/:txid` na Efí → `status === 'CONCLUIDA'` → valor da cobrança bate com `payment.grossAmount`. Só então o pedido é confirmado. Em produção o mTLS autentica as chamadas do gateway
+- Dedup do webhook: o `txid` entra no cache só depois de todas as validações e sai dele se o processamento falhar, para não engolir o reenvio da Efí
+- Access token: `authenticateAccessToken()` (em `src/lib/api/auth.ts`) valida a assinatura do JWT **e** consulta o usuário no banco, rejeitando `deletedAt` preenchido ou `status !== 'ACTIVE'`. Sem isso, bloquear ou excluir alguém só teria efeito depois dos 15 min de expiração do token. Vale para `withAuth` e `withRoles`
+- Consequência operacional: toda conta `ADMIN` precisa estar com `status = ACTIVE` no banco, porque o login não promove ADMIN de `PENDING` para `ACTIVE` como faz com BUYER
 - Cartão salvo: armazenar apenas payment_token gerado pelo efipay-js SDK, nunca dados de cartão brutos
 - Admin: rotas `/admin/*` vivem no mesmo app da V3, protegidas por middleware e checagem de role ADMIN
 - RLS Supabase: toda tabela com RLS habilitado — vendedor só lê/edita seus próprios produtos e pedidos, comprador só lê seus próprios pedidos
 - Tokens JWT: access token com expiração curta (15min), refresh token com expiração longa (7 dias) armazenados em cookies HTTP-only + tabela `RefreshToken`
+- Fronteiras cobertas por teste: `foodime-v3/e2e/security.spec.ts`
 
 ---
 
@@ -391,16 +395,22 @@ Configurar em GitHub → Settings → Secrets → Actions:
 
 > **Regra:** esta seção mantém apenas as **2 últimas alterações**. Ao adicionar uma nova, remova a mais antiga.
 
+### 2026-08-25 — Endurecimento de segurança do webhook e do access token
+**Problema:** (1) Webhook PIX confiava no payload da Efí: bastava um POST com um `txid` conhecido para marcar o pedido como pago, sem conferir status nem valor da cobrança. (2) O cache de dedup marcava o `txid` antes de processar, então uma falha no meio do caminho descartava em silêncio os reenvios da Efí por 10 minutos. (3) `withAuth`/`withRoles` só validavam a assinatura do JWT: um access token de usuário bloqueado ou deletado continuava valendo até expirar (15 min). (4) Sem testes cobrindo fronteiras de segurança. (5) `npm run lint` abria prompt interativo por falta de config ESLint. (6) 13 vulnerabilidades no `npm audit`.
+**Solução:** (1) Webhook consulta `getPixCharge(txid)` na Efí, exige `status === 'CONCLUIDA'` e compara o valor com `payment.grossAmount` antes de confirmar. (2) `processedIds` só recebe o `txid` depois das validações e é limpo no `catch`, liberando o reenvio. (3) Novo `authenticateAccessToken()` valida o JWT e busca o usuário no banco, rejeitando `deletedAt` ou `status !== 'ACTIVE'`; `withRoles` passou a usar o mesmo helper. (4) `e2e/security.spec.ts` com 6 testes de fronteira (redirect de anônimo, buyer barrado no `/admin`, seller barrado no `/home`, 401 sem token, 401 com token forjado, webhook com payload malformado). (5) `eslint.config.mjs` flat config com `next/core-web-vitals` e script `lint` migrado para `eslint .`. (6) nodemailer 6→9, bcrypt 5→6, prisma 6.19.3, `next-pwa` removido e `npm audit fix`: 13 → 8 vulnerabilidades.
+**Verificação:** `tsc --noEmit` (app e e2e) exit 0, `npm run lint` exit 0, `npm run build` exit 0, Playwright 31 passed / 1 skipped.
+**Arquivos:** `foodime-v3/src/app/api/payments/webhook/route.ts`, `foodime-v3/src/lib/api/auth.ts`, `foodime-v3/src/lib/api/roles.ts`, `foodime-v3/e2e/security.spec.ts`, `foodime-v3/e2e/card-payment.spec.ts`, `foodime-v3/eslint.config.mjs`, `foodime-v3/package.json`
+
+**Pendências abertas depois desta rodada:**
+- Banco Supabase inacessível (`FATAL: (ENOTFOUND) tenant/user postgres.wwrjqbfubhntcypzghar not found`) — bloqueia o teste de cartão ponta a ponta e o deploy
+- 8 vulnerabilidades restantes: `next`/`postcss`/`sharp` só saem com Next 16 (major); as de `prisma` "resolvem" com downgrade para 6.12; `uuid`/`gaxios` vêm de `google-auth-library@9` e o advisory não atinge o caminho que usamos (`verifyIdToken`)
+- Contas com role `ADMIN` precisam ter `status = ACTIVE` no banco: o login não promove ADMIN de `PENDING` para `ACTIVE` e agora a API rejeita quem não está ativo
+- `docs/GO_LIVE_CHECKLIST.md` ainda lista variáveis do Mercado Pago, defasado desde a migração para a Efí
+
 ### 2026-04-08 — CI/CD + Produção Railway
 **Problema:** CI quebrado com vars MercadoPago. `railway up --service backend` (nome errado). Sem `prisma migrate deploy` no pipeline. Health check sem ping real ao banco. Vars de ambiente não documentadas para Railway/GitHub Secrets.
 **Solução:** (1) `foodime-v3.yml`: removidas vars MP, adicionadas vars Efí dummy no build, step `prisma migrate deploy` no job deploy, service name corrigido para `laudable-dedication`. (2) `deploy.yml`: mesmo fix de nome + step de migrate. (3) `Dockerfile`: copia `node_modules/prisma` + `start.sh`; CMD usa `sh start.sh`. (4) `start.sh`: roda `prisma migrate deploy` antes de `node server.js`. (5) `health/route.ts`: `SELECT 1` no banco, retorna 503 se DB inacessível. (6) `PROJECT_MASTER.md` seção 10: tabelas de Railway vars + GitHub Secrets.
 **Arquivos:** `.github/workflows/foodime-v3.yml`, `.github/workflows/deploy.yml`, `foodime-v3/Dockerfile`, `foodime-v3/start.sh`, `foodime-v3/src/app/api/health/route.ts`, `docs/PROJECT_MASTER.md`
-
-### 2026-04-08 — Playwright E2E 25/25 passando
-**Problema:** 7 testes falhando: (1) strict mode em `reset-password` e `verify-email` (`getByText` ambíguo). (2) Login com credenciais erradas: API client fazia redirect para `/login` ao receber 401 (tentativa de refresh não mockada → `window.location.href = '/login'`). (3) Rota `/api/orders/buyer` sobrescrita pelo wildcard `/api/orders/**` por LIFO no Playwright. (4) Profile não mostrava nome do usuário: `useAuthStore` lê do Zustand localStorage, não da API — cookie injection não bastava.
-**Solução:** (1) Seletores → `getByRole('heading', ...)`. (2) Adicionado mock de `/api/auth/refresh` retornando 200 para que o retry do login rode corretamente e lance `ApiError` (em vez de redirecionar). (3) Invertida ordem de registro das rotas de orders (wildcard primeiro, específico depois). (4) `page.addInitScript()` para semear `auth-storage` no localStorage antes da navegação.
-**Arquivos:** `foodime-v3/e2e/fixtures.ts`, `foodime-v3/e2e/auth-flow.spec.ts`
-
 
 ---
 

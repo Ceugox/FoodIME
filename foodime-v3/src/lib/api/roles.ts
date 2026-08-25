@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken, type UserPayload } from '@/lib/jwt';
+import type { UserPayload } from '@/lib/jwt';
+import { authenticateAccessToken } from './auth';
 import { handleApiError } from './errors';
 
 type RolesHandler = (
@@ -15,10 +16,8 @@ export function withRoles(roles: string[], handler: RolesHandler) {
         return NextResponse.json({ message: 'Não autenticado' }, { status: 401 });
       }
 
-      let user: UserPayload;
-      try {
-        user = await verifyAccessToken(token);
-      } catch {
+      const user = await authenticateAccessToken(token);
+      if (!user) {
         return NextResponse.json({ message: 'Token inválido ou expirado' }, { status: 401 });
       }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { handleOrderPaid } from '@/services/payments.service';
 import { prisma } from '@/lib/prisma';
+import { getPixCharge } from '@/lib/efibank';
 
 // Simple deduplication cache
 const processedIds = new Map<string, number>();
@@ -11,6 +12,11 @@ function cleanupDedup() {
   for (const [key, ts] of processedIds) {
     if (now - ts > DEDUP_TTL) processedIds.delete(key);
   }
+}
+
+function amountsMatch(expected: unknown, received?: string): boolean {
+  if (!received) return false;
+  return Number(expected).toFixed(2) === Number(received).toFixed(2);
 }
 
 /**
@@ -49,9 +55,8 @@ export async function POST(req: NextRequest) {
     const txid = pixItem.txid;
     if (!txid) continue;
 
-    // Deduplication
+    // Deduplicate only while this process is actively handling a confirmed item.
     if (processedIds.has(txid)) continue;
-    processedIds.set(txid, Date.now());
 
     try {
       // Validate txid exists in our DB before processing (replaces mTLS validation in sandbox)
@@ -66,9 +71,23 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      const charge = await getPixCharge(txid);
+      if (charge.status !== 'CONCLUIDA') {
+        console.warn(`[webhook] PIX not concluded at Efí: ${txid} (${charge.status})`);
+        continue;
+      }
+
+      if (!amountsMatch(payment.grossAmount, charge.valor)) {
+        console.warn(`[webhook] Amount mismatch for txid ${txid}: expected ${payment.grossAmount}, got ${charge.valor}`);
+        continue;
+      }
+
+      processedIds.set(txid, Date.now());
       await handleOrderPaid(txid, 'PIX');
       console.log(`[webhook] PIX confirmed: ${txid}`);
     } catch (e) {
+      // Libera o txid para que o reenvio da Efí possa tentar de novo
+      processedIds.delete(txid);
       console.error(`[webhook] Error processing txid ${txid}:`, e);
     }
   }
